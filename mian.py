@@ -2,14 +2,14 @@ import numpy as np
 
 from targets_parsing.pars_targets import *
 # from sql_connection.queary_to_bd import *
-from sql_connection.extract_data_from_bd import sql_quary
+# from sql_connection.extract_data_from_bd import sql_quary
 from create_dataset.create_dataset_ import *
 from glob import glob
 from train_model import train_model
 from wand_config.config import *
 from datetime import datetime
 from create_dataset.converter_from_database_loader_to_npy import *
-
+from create_dataset.add_statistic_3month import add_statistic
 # ПОДГОТОВКА ДАННЫХ
 # 0. чтение из бд по ид_проекта
 # 1. создать stage.npy contractor.npy и тд
@@ -22,11 +22,11 @@ from create_dataset.converter_from_database_loader_to_npy import *
 
 
 if __name__ == '__main__':
-    PROJ_ID: int = 45700
+
     PATH_TO_TARGETS_EXCEL = 'data/targets_excel/*.xlsx'
     PATH_TO_SAVE_TARGETS = 'data'
     PATH_EXCEL_PROJECTS = 'data/features/'
-    PATH_NPY_PROJECTS = 'data/prepred_train_data2/'
+    PATH_NPY_PROJECTS = 'data/prepred_train_data/'
     SAVE_WEIGHT = 'data/WEIGHTS/'
     DOP_DATA_PATH = 'data/dop_materials/'
     NEED_LOAD_FROM_DB: int = 1
@@ -35,9 +35,13 @@ if __name__ == '__main__':
     CONVERT: int = 0
     TARGET: int = 0
     TRAIN: int = 0
+    CREATE_DATASET: int = 0
+
+
     if NEED_LOAD_FROM_DB:
         # 0 CONNECTION to DB
         # if CONNECT:
+        #     PROJ_ID: int = 45700
         #     df = pd.read_sql_query(sql_quary(proj_id=PROJ_ID), cnxn)
             # сохранить в exel
 
@@ -92,22 +96,43 @@ if __name__ == '__main__':
             targets = np.load(f'{PATH_TO_SAVE_TARGETS}/target_array.npy')
 
     # 4 CREATE DATASET
-    PD_tar = pd.DataFrame(targets)  # 0/1-contr/proj, 2-month, 3- year, 4 - res, 5 - val
-    Projects = list(glob(PATH_NPY_PROJECTS + '/*.npy'))[1:]
-    dict_data = create_dataset(Projects, PD_tar)
-    PD_DATA = pd.DataFrame(dict_data)
+    if CREATE_DATASET:
+        PD_tar = pd.DataFrame(targets)  # 0/1-contr/proj, 2-month, 3- year, 4 - res, 5 - val
+        Projects = list(glob(PATH_NPY_PROJECTS + '/*.npy'))[1:]
+        dict_data = create_dataset(Projects, PD_tar)
+        PD_DATA = pd.DataFrame(dict_data)
 
-    test_PD_DATA = PD_DATA.loc[(PD_DATA['month'] == 7) | (PD_DATA['month'] == 8)]
+        Stat_PD_DATA = add_statistic(PD_DATA)
+        Stat_PD_DATA.to_excel('data/Stat_PD_DATA.xlsx')
+    else:
+        Stat_PD_DATA = pd.read_excel('data/Stat_PD_DATA.xlsx')
+    #
+    mech_res_dict = np.load(DOP_DATA_PATH + 'mech_res_dict.npy', allow_pickle=True).item()
+    test_PD_DATA = Stat_PD_DATA.loc[(Stat_PD_DATA['month'] == 7) | (Stat_PD_DATA['month'] == 8)]
     test_PD_DATA = test_PD_DATA.loc[test_PD_DATA['year'] == 1]
-    train_PD_DATA = PD_DATA[~PD_DATA.index.isin(test_PD_DATA.index)]
+    train_PD_DATA = Stat_PD_DATA[~Stat_PD_DATA.index.isin(test_PD_DATA.index)]
+    train_PD_DATA = train_PD_DATA.sort_values(['year', 'month'])
+    test_PD_DATA = test_PD_DATA.sort_values(by=['year'])
 
-    train_dataset = PROJDataset(train_PD_DATA)
-    test_dataset = PROJDataset(test_PD_DATA)
+    # for lstm
+    # train_PD_DATA = train_PD_DATA.sort_values(by=['year'] and ['month'])
+    train_dataset = PROJDataset_sequenses(train_PD_DATA, mech_res_dict)
+    test_dataset = PROJDataset_sequenses(test_PD_DATA, mech_res_dict)
+
+    # for linear model
+    # train_dataset = PROJDataset(train_PD_DATA)
+    # test_dataset = PROJDataset(test_PD_DATA)
 
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=wandb.config['batch_size'], shuffle=False)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=wandb.config['batch_size'], shuffle=False)
 
+    # for i, d in enumerate(train_loader):
+    #     print(i, d[0].shape, d[1].shape)
+    #     print(f'data = {d[0]}')
+    #     print(f'targets = {d[1]}')
+
     # 5 Train model
     if TRAIN:
+
         train_model(net, train_loader, test_loader, criteria, 0, optimizer, 0, epochs, SAVE_WEIGHT, 'name')
         print(f"Done. Model saved in folder [{SAVE_WEIGHT}]")
