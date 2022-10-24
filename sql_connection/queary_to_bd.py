@@ -4,7 +4,7 @@ server = 'sql2019d01.cs.local,1433'
 database = 'ASU_GSP_dev'
 username = 'PMAdmin'
 password = 'PMAdmin'
-cnxn = pyodbc.connect('DRIVER={SQL Server};Server='
+cnxn = pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server};Server='
                       +server+';Database='+database+';uid='+username+
                       ';pwd='+ password+';TrustServerCertificate=yes;Encrypt=yes')
 cursor = cnxn.cursor()
