@@ -5,7 +5,7 @@ from sql_connection.queary_to_bd import *
 
 def create_stages(path_to_dop_materials: str = None):
 
-    projects_GSP = pd.DataFrame(pd.read_excel(path_to_dop_materials + 'Проекты ГСП.xls'))
+    projects_GSP = pd.DataFrame(pd.read_excel('data/Needed_materials/Проекты ГСП.xls'))
 
     sql = '''
            select p.id_project, p.project_code from publication.PROJECT as p

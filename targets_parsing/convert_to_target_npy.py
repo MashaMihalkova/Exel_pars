@@ -18,7 +18,7 @@ def convert_target_to_npy(target_xlsx: str = None, path_to_dop_materials: str = 
     targets['res_id'] = targets.res_name.map(mech_res_dict)
     targets['contr_id'] = targets.contractor.map(target_contractors_dict)
 
-    mech_missed_ids_dict = pd.read_excel(path_to_dop_materials+'mech_missed_ids.xlsx', usecols=[0, 1]).dropna()\
+    mech_missed_ids_dict = pd.read_excel('data/Needed_materials/mech_missed_ids.xlsx', usecols=[0, 1]).dropna()\
         .set_index('missed_name').id.to_dict()
     mech_res_dict_updated = {**mech_missed_ids_dict, **mech_res_dict}
     targets['res_id'] = targets.res_name.map(mech_res_dict_updated)
