@@ -71,9 +71,10 @@ def prepare_features(df, path, save_path, stages_dict):
     # вытягиваем в 2D и убираем нулевые ряды
     f_ar = feature_array.reshape(-1, 377)
     f_ar = f_ar[np.where(f_ar.sum(axis=1) != 0)[0]]
-    assert f_ar[:, 1:-3].sum() == feature_array[:, :, :, 1:-3].sum()
+    # assert f_ar[:, 1:-3].sum() == feature_array[:, :, :, 1:-3].sum()
 
-    name = path.split('\\')[-1].replace('.xlsx', '')
+    name = path.split('/')[-1].replace('.xlsx', '')
+    name = name.split('\\')[-1]
     stack = np.full((f_ar.shape[0], 1), stages_dict.get(name))
     f_ar = np.concatenate((stack, f_ar), axis=1)
     if not save_path: save_path = './data/prepred_train_data/'

@@ -3,6 +3,8 @@ import os
 import pandas as pd
 import numpy as np
 from glob import glob
+from Log.print_lib import *
+
 
 # xlsx parser - так как xlsx имеет другую структуру
 def parse_data(df):
@@ -27,7 +29,7 @@ def parse_data(df):
                                   'res_name': k, 'hours': v}])
 
                 # проверка на сумму машиночасов из словаря и из Экселя
-                assert round(sum(dict_res_name.values()), 0) == round(df.iloc[last_res_type_index, fact],
+                assert round(sum(dict_res_name.values()), 0) == round(df.iloc[last_res_type_index, 13],
                                                                       0), f'sum of machines = {sum(dict_res_name.values())} should be the same in Excel = {df.iloc[last_res_type_index, 13]}, last_resource_index ={last_res_type_index},current_index={ind}'
                 # break
 
@@ -118,8 +120,6 @@ def parse_data(df):
     return data
 
 
-
-
 # xls parser - так как xls имеет другую структуру
 def parse_data_xls(df, fact):
     year = int(df.iloc[0, 2][14:18])
@@ -148,7 +148,7 @@ def parse_data_xls(df, fact):
                 # assert round(sum(dict_res_name.values()), 0) == round(df.iloc[last_res_type_index, fact],
                 #                                                       0), f'sum of machines = {sum(dict_res_name.values())} should be the same in Excel = {df.iloc[last_res_type_index, fact]}, last_resource_index ={last_res_type_index},current_index={ind}'
 
-                print('Parsing finished')
+                print_i('Parsing finished')
                 break
 
                 # ищем OOO
@@ -207,8 +207,9 @@ def parse_data_xls(df, fact):
                                                                              i.lower())):  # еще вариант такой type(df.iloc[ind,8]) == int было до этого toBeDeleted:  not pd.isna(df.iloc[ind,8])
 
                 if (pd.isna(df.iloc[ind, 8])) & (pd.isna(df.iloc[ind, fact])):
-                    print('в строке нет ни часов ни вида техники. Значение этого ряда не будет учитываться', i,
-                          df.iloc[ind, :])
+                    # print_i('в строке нет ни часов ни вида техники. Значение этого ряда не будет учитываться', i,
+                    #       df.iloc[ind, :])
+                    print_i('в строке нет ни часов ни вида техники. Значение этого ряда не будет учитываться', i)
                     continue
 
                 # поскольку res_type может смениться у одного подрядчика - записываем в data

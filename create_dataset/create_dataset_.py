@@ -17,7 +17,6 @@ class PROJDataset(Dataset):
         data = self.X.iloc[ind, :-1]
         target_ = self.X.iloc[ind, -1:]
 
-
         if target_ is not None:
             return torch.tensor(data.values), torch.tensor(target_.values)
         else:

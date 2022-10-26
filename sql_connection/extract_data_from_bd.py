@@ -40,9 +40,9 @@ n.PO_id,n.PO_coef, a.id_activity,
 	i.isr_name, i.id_ISR,
 	a.activity_name, a.id_activity, t1.dt,
 	t1.resource_name, t1.id_resource, t1.act_reg_qty,
-	mt.resource_name AS "mat_res_name", mt.id_resource AS "mat_id_res", mt.act_reg_qty AS "mat_res_qt"
-	,
-	contr.contractor_name, contr.id_resource , contr.resource_name
+	mt.resource_name AS "mat_res_name", mt.id_resource AS "mat_id_res", mt.act_reg_qty AS "mat_res_qt",
+	contr.contractor_name, 
+	p.project_code
 FROM table1 t1
 LEFT JOIN mat_table mt ON mt.key_connect = t1.key_connect
 LEFT JOIN contractor contr ON  contr.key_connect2 = t1.key_connect2
