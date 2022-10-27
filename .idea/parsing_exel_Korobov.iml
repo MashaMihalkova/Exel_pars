@@ -5,6 +5,8 @@
       <excludeFolder url="file://$MODULE_DIR$/data" />
       <excludeFolder url="file://$MODULE_DIR$/data_" />
       <excludeFolder url="file://$MODULE_DIR$/data/Needed_materials" />
+      <excludeFolder url="file://$MODULE_DIR$/data_ — копия" />
+      <excludeFolder url="file://$MODULE_DIR$/data___" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

@@ -1,6 +1,7 @@
 from targets_parsing.pars_targets import *
 from targets_parsing.convert_to_target_npy import *
 from sql_connection.queary_to_bd import *
+# from sql_connection.databese import *  # подключение через SQLAlchemy, не выполняте запрос...
 from sql_connection.extract_data_from_bd import sql_quary
 from create_dataset.create_dataset_ import *
 from glob import glob
@@ -29,17 +30,33 @@ import numpy as np
         4. запускаем create_dataset
 """
 
+
+def download_projects(_id: int) -> int:
+    _df = pd.read_sql_query(sql_quary(proj_id=_id), cnxn)
+    if not _df.empty:
+        _flag = 1
+        _df.to_excel(PATH_EXCEL_PROJECTS + list(_df['project_name'].unique())[0] + '.xlsx')
+        print_i(
+            f"SUCCESS SAVE UNLOADING TO {PATH_EXCEL_PROJECTS + list(_df['project_name'].unique())[0] + '.xlsx'}")
+    else:
+        print_e(f"DATA WITH PROJECT_ID = {_id} IS EMPTY!")
+        _flag = 0
+    return _flag
+
+
 if __name__ == '__main__':
 
     parser = optparse.OptionParser()
 
-    parser.add_option('-l', '--NEED_LOAD_FROM_DB', type=int, help="NEED_LOAD_FROM_DB", default=1)
+    parser.add_option('-l', '--DOWNLOAD_ALL_PROJECTS_FROM_DB', type=int,
+                      help="DOWNLOAD_ALL_PROJECTS_FROM_DB instead of unloading a single project by id, unload all",
+                      default=0)
 
     parser.add_option('-t', '--PATH_TO_TARGETS_EXCEL', type=str,
-                      help="PATH_TO_TARGETS_EXCEL", default='data_/targets_excel/')
+                      help="PATH_TO_TARGETS_EXCEL", default='data/targets_excel/')
 
     parser.add_option('-s', '--PATH_TO_SAVE_TARGETS', type=str,
-                      help="PATH_TO_SAVE_TARGETS or PATH TO LOAD TARGET IF IT`S EXISTS", default='data')
+                      help="PATH_TO_SAVE_TARGETS or PATH TO LOAD TARGET IF IT`S EXISTS", default='data/')
 
     parser.add_option('-j', '--PATH_TO_PROJECTS', type=str, help="PATH_TO_PROJECTS", default='data/')
 
@@ -54,7 +71,8 @@ if __name__ == '__main__':
 
     parser.add_option('-c', '--CONNECT', type=int, help="CONNECT to db", default=1)
 
-    parser.add_option('-i', '--PROJ_ID', type=int, help="PROJ_ID", default=32159)
+    # parser.add_option('-i', '--PROJ_ID', type=int, help="PROJ_ID", default=32159)
+    parser.add_option('-i', '--PROJ_ID', type=str, help="PROJ_ID", default='32159')
 
     parser.add_option('-r', '--RELOAD_DOPS', type=int,
                       help="NEED TO RELOAD_DOPS IF IT`S CHANGED OR IT DOESNT EXIST", default=1)
@@ -68,7 +86,7 @@ if __name__ == '__main__':
     parser.add_option('-z', '--ADD_STATISTIC', type=int, help="ADD_STATISTIC to dataset 3 month", default=0)
 
     options, args = parser.parse_args()
-    NEED_LOAD_FROM_DB = getattr(options, 'NEED_LOAD_FROM_DB')
+    DOWNLOAD_ALL_PROJECTS_FROM_DB = getattr(options, 'DOWNLOAD_ALL_PROJECTS_FROM_DB')
 
     PATH_TO_TARGETS_EXCEL = getattr(options, 'PATH_TO_TARGETS_EXCEL')
     PATH_TO_SAVE_TARGETS = getattr(options, 'PATH_TO_SAVE_TARGETS')
@@ -79,12 +97,14 @@ if __name__ == '__main__':
     DOP_DATA_PATH = getattr(options, 'DOP_DATA_PATH')
 
     CONNECT = getattr(options, 'CONNECT')
-    PROJ_ID = getattr(options, 'PROJ_ID')
+    # PROJ_ID = getattr(options, 'PROJ_ID')
+    PROJ_ID = [int(item) for item in getattr(options, 'PROJ_ID').split(',')]
     RELOAD_DOPS = getattr(options, 'RELOAD_DOPS')
     CONVERT = getattr(options, 'CONVERT')
     TARGET = getattr(options, 'TARGET')
     CREATE_DATASET = getattr(options, 'CREATE_DATASET')
     ADD_STATISTIC = getattr(options, 'ADD_STATISTIC')
+
     TRAIN: int = 0
     BATCH_SIZE: int = 8
     LR: float = 0.001
@@ -94,7 +114,7 @@ if __name__ == '__main__':
     flag = 0
     error_flag = 0
 
-    model_type = ModelType.Linear
+    model_type = ModelType.Linear_3MONTH
     criteria_type = CriteriaType.MSE
 
     for dir_ in [PATH_TO_SAVE_TARGETS, PATH_TO_PROJECTS, PATH_EXCEL_PROJECTS, PATH_NPY_PROJECTS,
@@ -124,81 +144,87 @@ if __name__ == '__main__':
     # TRAIN: int = 0
     # CREATE_DATASET: int = 0
     # BATCH_SIZE: int = 8
+
     # region LOAD data from db
-    if NEED_LOAD_FROM_DB:
+    # if NEED_LOAD_FROM_DB:
         # 0 CONNECTION to DB
-        # region Connect to db
-        if CONNECT:
-            print_i(f'CONNECT TO DB, PROJ_ID = {PROJ_ID}')
-            df = pd.read_sql_query(sql_quary(proj_id=PROJ_ID), cnxn)
-            # save to exel
-            if not df.empty:
-                flag = 1
-                df.to_excel(PATH_EXCEL_PROJECTS + list(df['project_name'].unique())[0] + '.xlsx')
-                print_i(
-                    f"SUCCESS SAVE UNLOADING TO {PATH_EXCEL_PROJECTS + list(df['project_name'].unique())[0] + '.xlsx'}")
+    # region Connect to db
+    if CONNECT:
+        if DOWNLOAD_ALL_PROJECTS_FROM_DB:
+            print_i(f"TRY TO CONNECT TO DB AND DOWNLOAD ALL PROJECTS")
+            stages_data = pd.DataFrame(pd.read_excel(DOP_DATA_PATH + 'stages.xlsx'))  # noqa
+            stages_id = list(stages_data.id_project)
+            for _id in stages_id:
+                print_i(f"PROJECT_ID = {_id}")
+                flag = download_projects(_id)  # noqa
+                flag = 1  # noqa
+        else:
+            if isinstance(PROJ_ID, list):
+                for _id in PROJ_ID:
+                    print_i(f"PROJECT_ID = {_id}")
+                    flag = download_projects(_id)
             else:
-                print_e(f"DATA WITH PROJECT_ID = {PROJ_ID} IS EMPTY!")
-                flag = 0
-        # endregion
+                print_i(f'TRY TO CONNECT TO DB, PROJ_ID = {PROJ_ID[0]}')
+                flag = download_projects(PROJ_ID[0])
+    # endregion
 
-        # region RELOAD CONTRACTOR.npy MECH.npy STAGE.npy
-        # 1 CREATE CONTRACTOR.npy MECH.npy STAGE.npy
-        if RELOAD_DOPS:
-            print_i(f'RELOAD: mech_res_dict, stages_dict')
-            assert len([name for name in os.listdir(DOP_DATA_PATH) if os.path.isfile(os.path.join(DOP_DATA_PATH, name))]
-                       ) > 0, print_e("Закинь Norms.xlsx в папку Needed_materials")
-            df_norm = pd.read_excel('data/Needed_materials/Norms.xlsx')  # noqa
-            mech_res_list = pd.unique(df_norm.loc[pd.notna(df_norm.iloc[:, 4]), 'Работа\специальность\техника'])  # noqa
-            mech_res_dict = dict(zip(mech_res_list, range(len(mech_res_list))))
-            np.save(DOP_DATA_PATH + 'mech_res_dict.npy', mech_res_dict, allow_pickle=True)
-            df_stages = pd.read_excel(DOP_DATA_PATH + 'stages.xlsx')  # noqa
-            stages_dict = df_stages.set_index('project_name').id.to_dict()
-            np.save(DOP_DATA_PATH + 'stages_dict.npy', stages_dict, allow_pickle=True)
-            print_i('SUCCESS RELOADING')
+    # region RELOAD CONTRACTOR.npy MECH.npy STAGE.npy
+    # 1 CREATE CONTRACTOR.npy MECH.npy STAGE.npy
+    if RELOAD_DOPS:
+        print_i(f'TRY TO RELOAD: mech_res_dict, stages_dict')
+        assert len([name for name in os.listdir(DOP_DATA_PATH) if os.path.isfile(os.path.join(DOP_DATA_PATH, name))]
+                   ) > 0, print_e("Закинь Norms.xlsx в папку Needed_materials")
+        df_norm = pd.read_excel('data/Needed_materials/Norms.xlsx')  # noqa
+        mech_res_list = pd.unique(df_norm.loc[pd.notna(df_norm.iloc[:, 4]), 'Работа\специальность\техника'])  # noqa
+        mech_res_dict = dict(zip(mech_res_list, range(len(mech_res_list))))
+        np.save(DOP_DATA_PATH + 'mech_res_dict.npy', mech_res_dict, allow_pickle=True)
+        df_stages = pd.read_excel(DOP_DATA_PATH + 'stages.xlsx')  # noqa
+        stages_dict = df_stages.set_index('project_name').id.to_dict()
+        np.save(DOP_DATA_PATH + 'stages_dict.npy', stages_dict, allow_pickle=True)
+        print_i('SUCCESS RELOADING')
 
-            feature_contractors = []
-            for i, path in enumerate(glob(PATH_EXCEL_PROJECTS + '*.xlsx')):
-                print_d(i, path)
-                df = pd.read_excel(path)
-                feature_contractors.extend(pd.unique(df.contractor_name))
+        feature_contractors = []
+        for i, path in enumerate(glob(PATH_EXCEL_PROJECTS + '*.xlsx')):
+            print_d(i, path)
+            df = pd.read_excel(path)  # noqa
+            feature_contractors.extend(pd.unique(df.contractor_name))
 
-            feature_contractors = list(pd.unique(feature_contractors))
-            feature_contractor_dict = dict(zip(feature_contractors, range(len(feature_contractors))))
-            np.save(DOP_DATA_PATH + 'feature_contractor_dict.npy', feature_contractor_dict)
-        # endregion
+        feature_contractors = list(pd.unique(feature_contractors))
+        feature_contractor_dict = dict(zip(feature_contractors, range(len(feature_contractors))))
+        np.save(DOP_DATA_PATH + 'feature_contractor_dict.npy', feature_contractor_dict)
+    # endregion
 
-        # region convert projects to npy
-        # 2 CONVERT to proj_data(len = 378)
-        if CONVERT:
-            print_i(f'CONVERT XLSX PROJECTS TO NPY')
-            assert len([name for name in os.listdir(DOP_DATA_PATH) if
-                        os.path.isfile(os.path.join(DOP_DATA_PATH, name))]) > 1, print_e(
-                "Закинь данные в папку для доп материала")
-            # target_contractors_dict = np.load(DOP_DATA_PATH + 'feature_contractor_dict.npy', allow_pickle=True).item()
-            feature_contractor_dict = np.load(DOP_DATA_PATH + 'feature_contractor_dict.npy', allow_pickle=True).item()
-            mech_res_dict = np.load(DOP_DATA_PATH + 'mech_res_dict.npy', allow_pickle=True).item()
-            stages_dict = np.load(DOP_DATA_PATH + 'stages_dict.npy', allow_pickle=True).item()
-            if CONNECT and flag:
-                df['dt'] = df.dt.apply(lambda x: datetime.strptime(str(x), '%Y-%m-%d %H:%M:%S'))
-                df['year'] = df.dt.dt.year
-                df['month'] = df.dt.dt.month
-                df['res_id'] = df.resource_name.map(mech_res_dict)
-                df['contr_id'] = df.contractor_name.map(feature_contractor_dict)
-                prepare_features(df, PATH_EXCEL_PROJECTS + list(df['project_name'].unique())[0] + '.xlsx',
-                                 save_path=PATH_NPY_PROJECTS, stages_dict=stages_dict)
-            else:
-                for i, path in enumerate(glob(PATH_EXCEL_PROJECTS + '*.xlsx')):
-                    print(i, path)
-                    df = pd.read_excel(path)  # noqa
-                    df['dt'] = df.dt.apply(lambda x: datetime.strptime(x, '%Y-%m-%d %H:%M:%S'))
-                    df['year'] = df.dt.dt.year
-                    df['month'] = df.dt.dt.month
-                    df['res_id'] = df.resource_name.map(mech_res_dict)
-                    df['contr_id'] = df.contractor_name.map(feature_contractor_dict)
-                    prepare_features(df, path, save_path=PATH_NPY_PROJECTS, stages_dict=stages_dict)
-            print_i('SUCCESS CONVERT PROJECTS TO NPY')
-        # endregion
+    # region convert projects to npy
+    # 2 CONVERT to proj_data(len = 378)
+    if CONVERT:
+        print_i(f'TRY TO CONVERT XLSX PROJECTS TO NPY')
+        assert len([name for name in os.listdir(DOP_DATA_PATH) if
+                    os.path.isfile(os.path.join(DOP_DATA_PATH, name))]) > 1, print_e(
+            "Закинь данные в папку для доп материала")
+        # target_contractors_dict = np.load(DOP_DATA_PATH + 'feature_contractor_dict.npy', allow_pickle=True).item()
+        feature_contractor_dict = np.load(DOP_DATA_PATH + 'feature_contractor_dict.npy', allow_pickle=True).item()
+        mech_res_dict = np.load(DOP_DATA_PATH + 'mech_res_dict.npy', allow_pickle=True).item()
+        stages_dict = np.load(DOP_DATA_PATH + 'stages_dict.npy', allow_pickle=True).item()
+        # if CONNECT and flag:
+        #     df['dt'] = df.dt.apply(lambda x: datetime.strptime(str(x), '%Y-%m-%d %H:%M:%S'))
+        #     df['year'] = df.dt.dt.year
+        #     df['month'] = df.dt.dt.month
+        #     df['res_id'] = df.resource_name.map(mech_res_dict)
+        #     df['contr_id'] = df.contractor_name.map(feature_contractor_dict)
+        #     prepare_features(df, PATH_EXCEL_PROJECTS + list(df['project_name'].unique())[0] + '.xlsx',
+        #                      save_path=PATH_NPY_PROJECTS, stages_dict=stages_dict)
+        # else:
+        for i, path in enumerate(glob(PATH_EXCEL_PROJECTS + '*.xlsx')):
+            print(i, path)
+            df = pd.read_excel(path)  # noqa
+            df['dt'] = df.dt.apply(lambda x: datetime.strptime(x, '%Y-%m-%d %H:%M:%S'))
+            df['year'] = df.dt.dt.year
+            df['month'] = df.dt.dt.month
+            df['res_id'] = df.resource_name.map(mech_res_dict)
+            df['contr_id'] = df.contractor_name.map(feature_contractor_dict)
+            prepare_features(df, path, save_path=PATH_NPY_PROJECTS, stages_dict=stages_dict)
+        print_i('SUCCESS CONVERT PROJECTS TO NPY')
+    # endregion
     # endregion
 
     # region NEED CREATE TARGET
@@ -226,9 +252,9 @@ if __name__ == '__main__':
                 if i == 0:
                     a = pd.DataFrame(dat)
                 a = pd.concat([a, pd.DataFrame(dat)], axis=0, join='outer', ignore_index=True)
-            a.to_excel(f'{PATH_TO_SAVE_TARGETS}/whole_{year}.xlsx')
+            a.to_excel(f'{PATH_TO_SAVE_TARGETS}whole_{year}.xlsx')
             # targets = pd.read_excel(f'{PATH_TO_SAVE_TARGETS}/whole_{year}.xlsx')  # noqa
-            convert_target_to_npy(f'{PATH_TO_SAVE_TARGETS}/whole_{year}.xlsx', DOP_DATA_PATH, PATH_TO_SAVE_TARGETS)
+            convert_target_to_npy(f'{PATH_TO_SAVE_TARGETS}whole_{year}.xlsx', DOP_DATA_PATH, PATH_TO_SAVE_TARGETS)
             print_i(f"SUCCESS CREATE TARGET.NPY IN {PATH_TO_SAVE_TARGETS}")
     # else:
     #     print_i(f'TAKE TARGET FROM {PATH_TO_SAVE_TARGETS}')
@@ -242,7 +268,7 @@ if __name__ == '__main__':
         if error_flag:
             print_e(f'THERE IS NO target_array.npy IN {PATH_TO_SAVE_TARGETS}')
         else:
-            targets = np.load(PATH_TO_SAVE_TARGETS + '/target_array.npy')
+            targets = np.load(PATH_TO_SAVE_TARGETS + 'target_array.npy')
             print_i(f'TAKE TARGET FROM {PATH_TO_SAVE_TARGETS}')
             PD_tar = pd.DataFrame(targets)  # 0/1-contr/proj, 2-month, 3- year, 4 - res, 5 - val
             if PD_tar.empty:
@@ -250,7 +276,7 @@ if __name__ == '__main__':
 
         Projects = list(glob(PATH_NPY_PROJECTS + '/*.npy'))[0:]
         if len(Projects) > 0 and not error_flag:
-            dict_data = create_dataset(Projects, PD_tar)
+            dict_data = create_dataset(Projects, PD_tar)  # noqa
             PD_DATA = pd.DataFrame(dict_data)
             PD_DATA.to_excel(PATH_TO_PROJECTS + 'DATA.xlsx')
             if ADD_STATISTIC:
@@ -286,10 +312,14 @@ if __name__ == '__main__':
             # train_PD_DATA = train_PD_DATA.sort_values(by=['year'] and ['month'])
             train_dataset = PROJDataset_sequenses(train_PD_DATA, mech_res_dict)
             test_dataset = PROJDataset_sequenses(test_PD_DATA, mech_res_dict)
-        else:
+        elif model_type is ModelType.Linear or model_type is ModelType.Linear_3MONTH:
             # for linear model
             train_dataset = PROJDataset(train_PD_DATA)
             test_dataset = PROJDataset(test_PD_DATA)
+        # elif model_type is ModelType.Linear_3MONTH:
+        #     # for linear model with statistic
+        #     train_dataset = PROJDataset(train_PD_DATA)
+        #     test_dataset = PROJDataset(test_PD_DATA)
 
         # train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=wandb.config['batch_size'], shuffle=False)
         # test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=wandb.config['batch_size'], shuffle=False)
@@ -312,8 +342,9 @@ if __name__ == '__main__':
             "num_workers": NW,
             "weight_decay(l2)": L2,
         }
-        parametrs = Parameters(config, model_type, criteria_type)
-        train_model(parametrs.net, train_loader, test_loader, parametrs.criteria, 0, parametrs.optimizer, 0,
-                    parametrs.epochs, SAVE_WEIGHT, 'name')
+
+        model_param = Parameters(config, model_type, criteria_type)
+        train_model(model_param.net, train_loader, test_loader, model_param.criteria, 0, model_param.optimizer, 0,
+                    model_param.epochs, SAVE_WEIGHT, 'name')
         print(f"Done. Model saved in folder [{SAVE_WEIGHT}]")
     # endregion

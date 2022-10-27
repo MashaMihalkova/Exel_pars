@@ -1,11 +1,12 @@
-
 import torch
 import torch.nn as nn
 
+
 class positive_weights_linear(nn.Module):
-    '''class with positive weights output
+    """
+        class with positive weights output
         input array (shape (373) ) and res_id (torch.int64 or torch.long)
-    '''
+    """
 
     def __init__(self, in_features, out_features):
         super(positive_weights_linear, self).__init__()
@@ -25,12 +26,12 @@ from torch.autograd import Variable
 
 
 class predict_hours_net(nn.Module):
-    '''
+    """
         всего работ по нормам 373 шт. = "in_features" в слое "activity_dense"
         всего видов техники = 246 (все виды техники берутся из норм PO№№№ ) = "out_features" в слое "activity_dense"
         всего подрядчиков 4 шт. = "in_features" в слое "contractor_dense"
         всего проектов 23 шт. = "in_features" в слое "proj_dense"
-    '''
+    """
 
     def __init__(self, input_size, hidden_size, num_layers, device):
         super(predict_hours_net, self).__init__()
@@ -72,7 +73,6 @@ class predict_hours_net(nn.Module):
         return predict
 
 
-
 class LSTMClassifier(nn.Module):
     """Very simple implementation of LSTM-based time-series classifier."""
 
@@ -94,3 +94,49 @@ class LSTMClassifier(nn.Module):
         h0 = torch.zeros(self.layer_dim, x.size(0), self.hidden_dim)
         c0 = torch.zeros(self.layer_dim, x.size(0), self.hidden_dim)
         return [t.to(self.device) for t in (h0, c0)]
+
+
+class predict_hours_net_3MONTH(nn.Module):
+    """
+        всего работ по нормам 373 шт. = "in_features" в слое "activity_dense"
+        всего видов техники = 246 (все виды техники берутся из норм PO№№№ ) = "out_features" в слое "activity_dense"
+        всего подрядчиков 4 шт. = "in_features" в слое "contractor_dense"
+        всего проектов 23 шт. = "in_features" в слое "proj_dense"
+        последние три ячейки это результат работы техники за последние 3 месяца
+    """
+
+    def __init__(self):
+        super(predict_hours_net_3MONTH, self).__init__()
+
+        #  out_features = количество техник 246
+        self.activity_dense = positive_weights_linear(in_features=373, out_features=246)
+
+        self.proj_dense = torch.nn.Linear(in_features=23, out_features=1, bias=False)
+
+        self.contractor_dense = torch.nn.Linear(in_features=4, out_features=1, bias=False)
+
+        self.year_dense = torch.nn.Linear(in_features=2, out_features=1, bias=False)
+
+        self.month_dense = torch.nn.Linear(in_features=12, out_features=1, bias=False)
+
+        self.last_3_month = torch.nn.Linear(in_features=3, out_features=1, bias=False)
+
+    def forward(self, x):
+        month = x[
+                    -6].long() - 1  # так как выделенный слой имеет 12 весов - один вес для каждого месяца, начиная с нулевого
+        year = x[-5].long()
+        res_id = x[-4].long()
+        last_3_month = x[-3:]
+        contr_id = x[1].long()
+
+        sum_of_activities = self.activity_dense(x[2:-3], res_id)
+        sum_of_month = torch.sum(torch.relu(self.last_3_month.weight[0] * last_3_month))
+
+        sum_of_activities_month = self.month_dense.weight[0, month] * (sum_of_activities + sum_of_month)
+
+        sum_of_activities_month_year = self.year_dense.weight[0, year] * sum_of_activities_month
+
+        predict = self.contractor_dense.weight[0, contr_id] * sum_of_activities_month_year
+
+        return predict
+

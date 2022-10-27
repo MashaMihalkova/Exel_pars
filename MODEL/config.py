@@ -5,7 +5,7 @@ from typing import Optional
 
 class Parameters:
     def __init__(self, config: Optional[dict] = None, model_type: ModelType = ModelType.Linear,
-                 criteria_type: CriteriaType = CriteriaType.MAE):
+                 criteria_type: CriteriaType = CriteriaType.MAE) -> object:
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.criteria_type = criteria_type
         self._input_size = 407
