@@ -30,7 +30,7 @@ def create_dataset(projects, pd_tar):
         # else:
         #     proj = pd.read_excel(p)
         try:
-           proj = np.load(p)
+           proj = np.load(p, allow_pickle=True)
         except Exception as e:  # noqa
             proj = pd.read_excel(p)  # noqa
         pd_proj = pd.DataFrame(proj)  # 0/1 - proj/contr, 2-377 - PO

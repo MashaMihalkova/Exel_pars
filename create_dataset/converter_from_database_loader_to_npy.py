@@ -4,11 +4,15 @@ from tqdm import tqdm
 
 
 def prepare_features(df, path, save_path, stages_dict):
-    norm_dict = dict(zip(['PO' + str(i) for i in range(1, 374)], range(1, 374)))
+    if 'KS6.' in df['PO_id'][0]:
+        norm_dict = dict(zip(['KS6.' + str(i) for i in range(1, 374)], range(1, 374)))
+    else:
+        norm_dict = dict(zip(['PO' + str(i) for i in range(1, 374)], range(1, 374)))
 
     contr_list = pd.unique(df.contr_id)
     res_list = pd.unique(df.res_id)
-    feature_array = np.zeros((len(contr_list), len(res_list), 21, 377), dtype=float)
+    month_ = 24
+    feature_array = np.zeros((len(contr_list), len(res_list), month_, 377), dtype=float)
 
     for c in contr_list:
         # ищем позицию контрактора
@@ -35,6 +39,7 @@ def prepare_features(df, path, save_path, stages_dict):
                         feature_array[contr_position, res_position, month, norm_dict[i[0]]] = \
                             i[1].loc[:, 'act_reg_qty'].sum()
 
+
                     sum_feature_array = np.around(feature_array[contr_position, res_position, month].sum(), 2)
                     sum_dataframe = np.around(df_res_month.act_reg_qty.sum(), 2)
 
@@ -51,7 +56,7 @@ def prepare_features(df, path, save_path, stages_dict):
                     feature_array[contr_position, res_position, month, -2] = y - 2021
 
                     # записываем код техники
-                    feature_array[contr_position, res_position, month, -2] = r
+                    feature_array[contr_position, res_position, month, -1] = r
 
                     # записываем контрактора
                     feature_array[contr_position, res_position, month, 0] = c

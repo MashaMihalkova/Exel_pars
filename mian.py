@@ -9,6 +9,7 @@ from train_model import train_model
 # from wand_config.config import *
 # from datetime import datetime
 from create_dop_materials.create_stages import *
+from create_dop_materials.create_contractors import *
 from create_dataset.converter_from_database_loader_to_npy import *
 from create_dataset.add_statistic_3month import add_statistic
 import optparse
@@ -69,17 +70,17 @@ if __name__ == '__main__':
 
     parser.add_option('-d', '--DOP_DATA_PATH', type=str, help="DOP_DATA_PATH", default='data/dop_materials/')
 
-    parser.add_option('-c', '--CONNECT', type=int, help="CONNECT to db", default=1)
+    parser.add_option('-c', '--CONNECT', type=int, help="CONNECT to db", default=0)
 
     # parser.add_option('-i', '--PROJ_ID', type=int, help="PROJ_ID", default=32159)
-    parser.add_option('-i', '--PROJ_ID', type=str, help="PROJ_ID", default='32159')
+    parser.add_option('-i', '--PROJ_ID', type=str, help="PROJ_ID", default='44845')
 
     parser.add_option('-r', '--RELOAD_DOPS', type=int,
-                      help="NEED TO RELOAD_DOPS IF IT`S CHANGED OR IT DOESNT EXIST", default=1)
+                      help="NEED TO RELOAD_DOPS IF IT`S CHANGED OR IT DOESNT EXIST", default=0)
 
-    parser.add_option('-v', '--CONVERT', type=int, help="CONVERT PROJECT TO NUMPY", default=1)
+    parser.add_option('-v', '--CONVERT', type=int, help="CONVERT PROJECT TO NUMPY", default=0)
 
-    parser.add_option('-g', '--TARGET', type=int, help="NEED TO PARSING TARGETS", default=1)
+    parser.add_option('-g', '--TARGET', type=int, help="NEED TO PARSING TARGETS", default=0)
 
     parser.add_option('-a', '--CREATE_DATASET', type=int, help="CREATE_DATASET", default=1)
 
@@ -125,9 +126,10 @@ if __name__ == '__main__':
     if not os.path.exists(DOP_DATA_PATH + 'stages.xlsx'):
         create_stages(DOP_DATA_PATH)
         print_i(f'в папке {DOP_DATA_PATH} создался файл stages.xlsx')
-        # dict_ = {'id': [], 'project_name': [], 'id_project': [], 'name_id': [], 'Note': []}
-        # pd.DataFrame(dict_).set_index('id').to_excel(DOP_DATA_PATH + 'stages.xlsx')
-        # print_e(f'!!! в папке{DOP_DATA_PATH}, нет stages.xlsx. Файл был создан пустым. !!! ')
+
+    if not os.path.exists((DOP_DATA_PATH+'all_contractors.xlsx')):
+        create_contractors(DOP_DATA_PATH)
+        print_i(f'в папке {DOP_DATA_PATH} создался файл all_contractors.xlsx')
 
     # PATH_TO_TARGETS_EXCEL = 'data/targets_excel/*.xlsx'
     # PATH_TO_SAVE_TARGETS = 'data'
@@ -181,17 +183,18 @@ if __name__ == '__main__':
         df_stages = pd.read_excel(DOP_DATA_PATH + 'stages.xlsx')  # noqa
         stages_dict = df_stages.set_index('project_name').id.to_dict()
         np.save(DOP_DATA_PATH + 'stages_dict.npy', stages_dict, allow_pickle=True)
+
+
+        # feature_contractors = []
+        # for i, path in enumerate(glob(PATH_EXCEL_PROJECTS + '*.xlsx')):
+        #     print_d(i, path)
+        #     df = pd.read_excel(path)  # noqa
+        #     feature_contractors.extend(pd.unique(df.contractor_name))
+        #
+        # feature_contractors = list(pd.unique(feature_contractors))
+        # feature_contractor_dict = dict(zip(feature_contractors, range(len(feature_contractors))))
+        # np.save(DOP_DATA_PATH + 'feature_contractor_dict.npy', feature_contractor_dict)
         print_i('SUCCESS RELOADING')
-
-        feature_contractors = []
-        for i, path in enumerate(glob(PATH_EXCEL_PROJECTS + '*.xlsx')):
-            print_d(i, path)
-            df = pd.read_excel(path)  # noqa
-            feature_contractors.extend(pd.unique(df.contractor_name))
-
-        feature_contractors = list(pd.unique(feature_contractors))
-        feature_contractor_dict = dict(zip(feature_contractors, range(len(feature_contractors))))
-        np.save(DOP_DATA_PATH + 'feature_contractor_dict.npy', feature_contractor_dict)
     # endregion
 
     # region convert projects to npy
@@ -202,7 +205,8 @@ if __name__ == '__main__':
                     os.path.isfile(os.path.join(DOP_DATA_PATH, name))]) > 1, print_e(
             "Закинь данные в папку для доп материала")
         # target_contractors_dict = np.load(DOP_DATA_PATH + 'feature_contractor_dict.npy', allow_pickle=True).item()
-        feature_contractor_dict = np.load(DOP_DATA_PATH + 'feature_contractor_dict.npy', allow_pickle=True).item()
+        # feature_contractor_dict = np.load(DOP_DATA_PATH + 'feature_contractor_dict.npy', allow_pickle=True).item()
+        feature_contractor_dict = np.load(DOP_DATA_PATH + 'all_contractors.npy', allow_pickle=True).item()
         mech_res_dict = np.load(DOP_DATA_PATH + 'mech_res_dict.npy', allow_pickle=True).item()
         stages_dict = np.load(DOP_DATA_PATH + 'stages_dict.npy', allow_pickle=True).item()
         # if CONNECT and flag:
@@ -217,7 +221,7 @@ if __name__ == '__main__':
         for i, path in enumerate(glob(PATH_EXCEL_PROJECTS + '*.xlsx')):
             print(i, path)
             df = pd.read_excel(path)  # noqa
-            df['dt'] = df.dt.apply(lambda x: datetime.strptime(x, '%Y-%m-%d %H:%M:%S'))
+            df['dt'] = df.dt.apply(lambda x: datetime.strptime(str(x), '%Y-%m-%d %H:%M:%S'))
             df['year'] = df.dt.dt.year
             df['month'] = df.dt.dt.month
             df['res_id'] = df.resource_name.map(mech_res_dict)
@@ -236,11 +240,12 @@ if __name__ == '__main__':
         else:
             a = pd.DataFrame()
             year = 0
+            i = 0
             for i, path_ in enumerate(glob(PATH_TO_TARGETS_EXCEL+'*.xls')):
                 print_d(i, path_)
                 dataframe = pd.read_excel(path_)  # noqa
                 if os.path.splitext(path_)[-1] == '.xls':
-                    dat = parse_data_xls(dataframe, fact=6)
+                    dat = parse_data_xls(dataframe, fact=13)
                 else:
                     dat = parse_data(dataframe)
                 # dat = parse_data_xls(dataframe)
@@ -252,6 +257,20 @@ if __name__ == '__main__':
                 if i == 0:
                     a = pd.DataFrame(dat)
                 a = pd.concat([a, pd.DataFrame(dat)], axis=0, join='outer', ignore_index=True)
+
+            for ii, path_ in enumerate(glob(PATH_TO_TARGETS_EXCEL+'*.xlsx')):
+                print_d(ii, path_)
+                dataframe = pd.read_excel(path_)  # noqa
+                if os.path.splitext(path_)[-1] == '.xlsx':
+                    dat = parse_data(dataframe)
+                year = int(dataframe.iloc[0, 2][14:18])
+                month = int(dataframe.iloc[0, 2][11:13])
+
+                # pd.DataFrame(dat).to_excel(f'{PATH_TO_SAVE_TARGETS}/{month}_{year}.xlsx')
+                if i == 0:
+                    a = pd.DataFrame(dat)
+                a = pd.concat([a, pd.DataFrame(dat)], axis=0, join='outer', ignore_index=True)
+
             a.to_excel(f'{PATH_TO_SAVE_TARGETS}whole_{year}.xlsx')
             # targets = pd.read_excel(f'{PATH_TO_SAVE_TARGETS}/whole_{year}.xlsx')  # noqa
             convert_target_to_npy(f'{PATH_TO_SAVE_TARGETS}whole_{year}.xlsx', DOP_DATA_PATH, PATH_TO_SAVE_TARGETS)
@@ -299,7 +318,6 @@ if __name__ == '__main__':
 
     if not error_flag:
         Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA.xlsx')  # noqa
-        mech_res_dict = np.load(DOP_DATA_PATH + 'mech_res_dict.npy', allow_pickle=True).item()
         test_PD_DATA = Stat_PD_DATA.loc[(Stat_PD_DATA['month'] == 7) | (Stat_PD_DATA['month'] == 8)]
         test_PD_DATA = test_PD_DATA.loc[test_PD_DATA['year'] == 1]
         train_PD_DATA = Stat_PD_DATA[~Stat_PD_DATA.index.isin(test_PD_DATA.index)]
@@ -310,6 +328,7 @@ if __name__ == '__main__':
         print_i(f'ModelType = {model_type}')
         if model_type is ModelType.LSTM:
             # train_PD_DATA = train_PD_DATA.sort_values(by=['year'] and ['month'])
+            mech_res_dict = np.load(DOP_DATA_PATH + 'mech_res_dict.npy', allow_pickle=True).item()
             train_dataset = PROJDataset_sequenses(train_PD_DATA, mech_res_dict)
             test_dataset = PROJDataset_sequenses(test_PD_DATA, mech_res_dict)
         elif model_type is ModelType.Linear or model_type is ModelType.Linear_3MONTH:

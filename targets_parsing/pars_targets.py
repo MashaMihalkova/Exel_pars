@@ -190,8 +190,8 @@ def parse_data_xls(df, fact):
                                       'res_name': k, 'hours': v}])
 
                     # проверка на сумму машиночасов из словаря и из Экселя
-                    assert round(sum(dict_res_name.values()), 0) == round(df.iloc[last_res_type_index, fact],
-                                                                          0), f'sum of machines = {sum(dict_res_name.values())} should be the same in Excel = {df.iloc[last_res_type_index, fact]}, last_resource_index ={last_res_type_index},current_index={ind}'
+                    # assert round(sum(dict_res_name.values()), 0) == round(df.iloc[last_res_type_index, fact],
+                    #                                                       0), f'sum of machines = {sum(dict_res_name.values())} should be the same in Excel = {df.iloc[last_res_type_index, fact]}, last_resource_index ={last_res_type_index},current_index={ind}'
 
                     dict_res_name = dict()  # обнуляем словарь так как начинается другой тип машин
 
