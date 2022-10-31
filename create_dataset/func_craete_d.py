@@ -15,6 +15,7 @@ VALUE_T = 5  # индекс начала hours в target
 
 
 def create_dataset(projects, pd_tar):
+    # TODO: заменить месяца от 1 до 12 в сохранении + мб в преобразовании проектов тоже
     dict_data = {'proj_id': [], 'contr_id': []}
     for i in range(LEN_PO):
         dict_data[f'{i}'] = []
@@ -44,29 +45,55 @@ def create_dataset(projects, pd_tar):
 
         for contr in contr_unoque:
             contr_id = proj_id.loc[proj_id[CONTR_ID] == contr]
-            for month in month_unique:
-                month_id = contr_id.loc[contr_id[MONTH_T] == month]
-                if month_id.shape[0] != 0:
-                    for year in year_unique:
-                        if year == 0:
-                            y = 2021.0
-                        else:
-                            y = 2022.0
-                        year_id = month_id.loc[month_id[YEAR_T] == y]
-                        if year_id.shape[0] != 0:
-                            for res in res_unique:
-                                res_id = year_id.loc[year_id[RESOURCE_T] == res]
-                                if res_id.shape[0] != 0:
-                                    target = res_id[VALUE_T].values.sum()
-                                    contract_p = pd_proj.loc[pd_proj[CONTR_ID] == contr]
-                                    month_p = contract_p.loc[contract_p[MONTH_P] == month]
-                                    year_p = month_p.loc[month_p[YEAR_P] == year]
-                                    res_p = year_p.loc[year_p[RESOURCE_P] == res]
-                                    if res_p.shape[0] != 0:
-                                        # print(1)
-                                        dict_pd['proj_id'].append(pd_proj[0][0])
-                                        dict_pd['target'].append(target)
-                                        dict_pd['row'].append(res_p.index[0])
+            if contr_id.shape[0] != 0:
+                for year in year_unique:
+                    if year == 0:
+                        y = 2021.0
+                        # month_n = month
+                    else:
+                        y = 2022.0
+                    year_id = contr_id.loc[contr_id[YEAR_T] == y]
+                    if year_id.shape[0] != 0:
+                        for month in month_unique:
+                            if month > 12:
+                                month_n = month - 12
+                            else:
+                                month_n = month
+                            month_id = year_id.loc[year_id[MONTH_T] == month_n]
+
+                    # if contr_id.loc[contr_id[YEAR_T]]
+                    # if month_id.shape[0] != 0:
+                    #     for year in year_unique:
+                    #         if year == 0:
+                    #             y = 2021.0
+                    #             month_n = month
+                    #         else:
+                    #             y = 2022.0
+                    #             if month < 13:
+                    #                 month_n = month
+                    #             else:
+                    #                 month_n = month
+                    #         year_id = month_id.loc[month_id[YEAR_T] == y]
+                            if month_id.shape[0] != 0:
+                                if year:  # 2022
+                                    month_n = month_n + 12
+                                else:
+                                    month_n = month_n
+                                for res in res_unique:
+                                    res_id = month_id.loc[month_id[RESOURCE_T] == res]
+                                    if res_id.shape[0] != 0:
+                                        target = res_id[VALUE_T].values.sum()
+                                        contract_p = pd_proj.loc[pd_proj[CONTR_ID] == contr]
+
+                                        month_p = contract_p.loc[contract_p[MONTH_P] == month_n]
+
+                                        year_p = month_p.loc[month_p[YEAR_P] == year]
+                                        res_p = year_p.loc[year_p[RESOURCE_P] == res]
+                                        if res_p.shape[0] != 0:
+                                            # print(1)
+                                            dict_pd['proj_id'].append(pd_proj[0][0])
+                                            dict_pd['target'].append(target)
+                                            dict_pd['row'].append(res_p.index[0])
 
         for i, val in enumerate(dict_pd['row']):
             pd_p = pd_proj.iloc[val]

@@ -20,11 +20,16 @@ class Parameters:
                                       self._num_layers,
                                       self._output_dim,
                                       self.device)
-        else:
+        elif self.model_type is ModelType.Linear:
             self.net = predict_hours_net(self._input_size,
                                          self._hidden_size,
                                          self._num_layers,
                                          self.device)
+        elif self.model_type is ModelType.Linear_3MONTH:
+            self.net = predict_hours_net_3MONTH(self._input_size,
+                                                self._hidden_size,
+                                                self._num_layers,
+                                                self.device)
 
         if self.criteria_type is CriteriaType.MSE:
             self.criteria = torch.nn.MSELoss()

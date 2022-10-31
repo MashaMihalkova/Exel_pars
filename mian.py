@@ -5,7 +5,7 @@ from sql_connection.queary_to_bd import *
 from sql_connection.extract_data_from_bd import sql_quary
 from create_dataset.create_dataset_ import *
 from glob import glob
-from train_model import train_model
+from train_model import train_model, train
 # from wand_config.config import *
 # from datetime import datetime
 from create_dop_materials.create_stages import *
@@ -82,9 +82,9 @@ if __name__ == '__main__':
 
     parser.add_option('-g', '--TARGET', type=int, help="NEED TO PARSING TARGETS", default=0)
 
-    parser.add_option('-a', '--CREATE_DATASET', type=int, help="CREATE_DATASET", default=1)
+    parser.add_option('-a', '--CREATE_DATASET', type=int, help="CREATE_DATASET", default=0)
 
-    parser.add_option('-z', '--ADD_STATISTIC', type=int, help="ADD_STATISTIC to dataset 3 month", default=0)
+    parser.add_option('-z', '--ADD_STATISTIC', type=int, help="ADD_STATISTIC to dataset 3 month", default=1)
 
     options, args = parser.parse_args()
     DOWNLOAD_ALL_PROJECTS_FROM_DB = getattr(options, 'DOWNLOAD_ALL_PROJECTS_FROM_DB')
@@ -106,7 +106,7 @@ if __name__ == '__main__':
     CREATE_DATASET = getattr(options, 'CREATE_DATASET')
     ADD_STATISTIC = getattr(options, 'ADD_STATISTIC')
 
-    TRAIN: int = 0
+    TRAIN: int = 1
     BATCH_SIZE: int = 8
     LR: float = 0.001
     EPOCH: int = 10
@@ -183,7 +183,6 @@ if __name__ == '__main__':
         df_stages = pd.read_excel(DOP_DATA_PATH + 'stages.xlsx')  # noqa
         stages_dict = df_stages.set_index('project_name').id.to_dict()
         np.save(DOP_DATA_PATH + 'stages_dict.npy', stages_dict, allow_pickle=True)
-
 
         # feature_contractors = []
         # for i, path in enumerate(glob(PATH_EXCEL_PROJECTS + '*.xlsx')):
@@ -310,14 +309,17 @@ if __name__ == '__main__':
                 error_flag = 1
             #     Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS+ 'DATA.xlsx')  # noqa
     else:
-        if os.path.exists(f'{PATH_TO_PROJECTS}+DATA.xlsx'):
+        if os.path.exists(f'{PATH_TO_PROJECTS}DATA.xlsx'):
             print_i(f'TAKE DATASET FROM {PATH_TO_PROJECTS}DATA.xlsx')
         else:
             print_e(f"THERE ARE NO ANY FILES IN {PATH_TO_PROJECTS}DATA.xlsx ")
             error_flag = 1
 
     if not error_flag:
-        Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA.xlsx')  # noqa
+        if ADD_STATISTIC:
+            Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'Stat_PD_DATA.xlsx')  # noqa
+        else:
+            Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA.xlsx')  # noqa
         test_PD_DATA = Stat_PD_DATA.loc[(Stat_PD_DATA['month'] == 7) | (Stat_PD_DATA['month'] == 8)]
         test_PD_DATA = test_PD_DATA.loc[test_PD_DATA['year'] == 1]
         train_PD_DATA = Stat_PD_DATA[~Stat_PD_DATA.index.isin(test_PD_DATA.index)]
@@ -363,7 +365,9 @@ if __name__ == '__main__':
         }
 
         model_param = Parameters(config, model_type, criteria_type)
-        train_model(model_param.net, train_loader, test_loader, model_param.criteria, 0, model_param.optimizer, 0,
+        # train_model(model_param.net, train_loader, test_loader, model_param.criteria, 0, model_param.optimizer, 0,
+        #             model_param.epochs, SAVE_WEIGHT, 'name')
+        train(model_param.net, train_loader, test_loader, model_param.criteria, 0, model_param.optimizer, 0,
                     model_param.epochs, SAVE_WEIGHT, 'name')
         print(f"Done. Model saved in folder [{SAVE_WEIGHT}]")
     # endregion

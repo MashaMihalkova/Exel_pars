@@ -105,8 +105,9 @@ class predict_hours_net_3MONTH(nn.Module):
         последние три ячейки это результат работы техники за последние 3 месяца
     """
 
-    def __init__(self):
+    def __init__(self, input_size, hidden_size, num_layers, device):
         super(predict_hours_net_3MONTH, self).__init__()
+        # todo: контракторов 4 , в статистику заносятся их ид который просто чисто (например 14)
 
         #  out_features = количество техник 246
         self.activity_dense = positive_weights_linear(in_features=373, out_features=246)
@@ -122,14 +123,13 @@ class predict_hours_net_3MONTH(nn.Module):
         self.last_3_month = torch.nn.Linear(in_features=3, out_features=1, bias=False)
 
     def forward(self, x):
-        month = x[
-                    -6].long() - 1  # так как выделенный слой имеет 12 весов - один вес для каждого месяца, начиная с нулевого
+        month = x[-6].long() - 1   # так как выделенный слой имеет 12 весов-один вес для каждого месяца,начиная с 0-го
         year = x[-5].long()
         res_id = x[-4].long()
         last_3_month = x[-3:]
         contr_id = x[1].long()
 
-        sum_of_activities = self.activity_dense(x[2:-3], res_id)
+        sum_of_activities = self.activity_dense(x[2:-6], res_id)
         sum_of_month = torch.sum(torch.relu(self.last_3_month.weight[0] * last_3_month))
 
         sum_of_activities_month = self.month_dense.weight[0, month] * (sum_of_activities + sum_of_month)

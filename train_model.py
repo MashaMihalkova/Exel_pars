@@ -1,4 +1,5 @@
 from MODEL import *
+from sklearn.metrics import mean_absolute_error
 
 target = []
 predictions = []
@@ -33,8 +34,6 @@ def train_model(model, train_dataloader, val_dataloader, loss, loss_ls, optimize
 
             running_loss_1out = 0.
             running_acc_1out = 0.
-
-
 
             # Iterate over data.
             for j, (features, target) in enumerate(dataloader):
@@ -93,3 +92,55 @@ def train_model(model, train_dataloader, val_dataloader, loss, loss_ls, optimize
                 torch.save(model.state_dict(), f"{path_weigh_save}log_model_epoch{epoch}_loss{epoch_loss_1out :.3f}.pt")
     return model, train_loss, val_loss_1out, train_acc_1out, val_acc_1out
 
+
+def train(model, train_dataloader, val_dataloader, loss, loss_ls, optimizer, scheduler, num_epochs,
+          path_weigh_save, model_name: str):
+    min_loss = 100
+    for epoch in range(num_epochs):
+        for features, target in train_dataloader:
+            optimizer.zero_grad()
+            preds = torch.tensor([])
+            features = features.to(torch.float)
+            target = target.to(torch.float)
+
+            target = target[(features[:, -2] == 1) * (features[:, -3] > 5) == 0]
+            features = features[(features[:, -2] == 1) * (features[:, -3] > 5) == 0]
+            if features.shape[0] == 0: pass
+
+            for i in range(features.shape[0]):
+                pred = model(features[i])
+                preds = torch.cat((preds, pred.view(-1, 1)), 0)
+
+            loss_ = loss(preds, target)
+            loss_i = loss_.item()
+            loss_.backward()
+            optimizer.step()
+
+        # calculating MAE metric
+        predict = []
+        targets = []
+
+        for features, target in train_dataloader:
+
+            features = features.to(torch.float)
+            targets.extend(target.view(-1).tolist())
+
+            for i in range(features.shape[0]):
+                with torch.no_grad():
+                    pred = model(features[i])
+                    predict.append(pred.tolist())
+        mae = mean_absolute_error(targets, predict)
+        if epoch % 10 == 0:
+            print("Epoch {}\n Current loss={}, MAE = {}".format(epoch, loss_i, mae))
+
+        # wandb.log({f"loss": loss_i, "epoch": epoch, "mae": mae})
+        if loss_i < min_loss:
+            min_loss = loss_i
+            torch.save(model.state_dict(), f"{path_weigh_save}log_model_huber_05_loss{loss_i :.3f}.pt")
+
+    return model
+
+
+# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# train()
+# print(f"Done. Model saved in folder [{path_weigh_save}]")

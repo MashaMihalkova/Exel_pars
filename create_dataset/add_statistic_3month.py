@@ -5,6 +5,7 @@ from create_dataset.func_craete_d import *
 
 def add_statistic(Data: pd.DataFrame) -> pd.DataFrame:
     # print(Data)
+    # TODO: неверная последовательность колонок записывается и ненужная первая колонка и month_
     Data_ = Data.copy()
     Data_['month_year'] = 0
     Data_['m_1'] = 0
