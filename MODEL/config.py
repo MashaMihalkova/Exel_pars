@@ -13,6 +13,7 @@ class Parameters:
         self._num_layers = 10  # 9
         self._output_dim = 1
         self.model_type = model_type
+        self.huber_delta = 0.5
 
         if self.model_type is ModelType.LSTM:
             self.net = LSTMClassifier(self._input_size,
@@ -33,7 +34,9 @@ class Parameters:
 
         if self.criteria_type is CriteriaType.MSE:
             self.criteria = torch.nn.MSELoss()
-        else:
+        elif self.criteria_type is CriteriaType.HuberLoss:
+            self.criteria = torch.nn.HuberLoss(delta=self.huber_delta)
+        elif self.criteria_type is CriteriaType.MAE:
             self.criteria = torch.nn.L1Loss(size_average=None, reduce=None, reduction='mean')
 
         self.optimizer = None

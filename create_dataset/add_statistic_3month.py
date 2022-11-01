@@ -5,7 +5,7 @@ from create_dataset.func_craete_d import *
 
 def add_statistic(Data: pd.DataFrame) -> pd.DataFrame:
     # print(Data)
-    # TODO: неверная последовательность колонок записывается и ненужная первая колонка и month_
+
     Data_ = Data.copy()
     Data_['month_year'] = 0
     Data_['m_1'] = 0
@@ -69,5 +69,11 @@ def add_statistic(Data: pd.DataFrame) -> pd.DataFrame:
                                         sum_rows[groups[i][j - 3]] * 100 / summa_100
 
                 Data_.iloc[list(sort_res_pr_con.index.values), :] = sort_res_pr_con
+    Data_ = Data_.drop('month_year', axis=1)
+    cols = list(Data_.columns)
+    a, b, c, d = cols.index('target'), cols.index('m_1'), cols.index('m_2'), cols.index('m_3')
+    cols[a], cols[b], cols[c], cols[d] = cols[b], cols[c], cols[d], cols[a]
+    Data_ = Data_[cols]
+
     return Data_
 

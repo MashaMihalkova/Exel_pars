@@ -18,6 +18,7 @@ from Log.print_lib import *
 import os
 import pandas as pd
 import numpy as np
+from test_model import *
 
 """
     ПОДГОТОВКА ДАННЫХ
@@ -30,6 +31,28 @@ import numpy as np
     СОЗДАНИЕ БД
         4. запускаем create_dataset
 """
+
+
+def create_dataloaders_train_test(pd_data, model_type):  # noqa
+    test_PD_DATA = pd_data.loc[(pd_data['month'] == 7) | (pd_data['month'] == 8)]
+    test_PD_DATA = test_PD_DATA.loc[test_PD_DATA['year'] == 1]
+    train_PD_DATA = pd_data[~pd_data.index.isin(test_PD_DATA.index)]
+    train_PD_DATA = train_PD_DATA.sort_values(['year', 'month'])
+    test_PD_DATA = test_PD_DATA.sort_values(by=['year'])
+
+    print_i(f'ModelType = {model_type}')
+    if model_type is ModelType.LSTM:
+        mech_res_dict = np.load(DOP_DATA_PATH + 'mech_res_dict.npy', allow_pickle=True).item()  # noqa
+        train_dataset = PROJDataset_sequenses(train_PD_DATA, mech_res_dict)  # noqa
+        test_dataset = PROJDataset_sequenses(test_PD_DATA, mech_res_dict)  # noqa
+    elif model_type is ModelType.Linear or model_type is ModelType.Linear_3MONTH:
+        train_dataset = PROJDataset(train_PD_DATA)  # noqa
+        test_dataset = PROJDataset(test_PD_DATA)  # noqa
+    # train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=wandb.config['batch_size'], shuffle=False)
+    # test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=wandb.config['batch_size'], shuffle=False)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False)  # noqa
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)  # noqa
+    return train_loader, test_loader
 
 
 def download_projects(_id: int) -> int:
@@ -82,7 +105,7 @@ if __name__ == '__main__':
 
     parser.add_option('-g', '--TARGET', type=int, help="NEED TO PARSING TARGETS", default=0)
 
-    parser.add_option('-a', '--CREATE_DATASET', type=int, help="CREATE_DATASET", default=0)
+    parser.add_option('-a', '--CREATE_DATASET', type=int, help="CREATE_DATASET", default=1)
 
     parser.add_option('-z', '--ADD_STATISTIC', type=int, help="ADD_STATISTIC to dataset 3 month", default=1)
 
@@ -106,7 +129,8 @@ if __name__ == '__main__':
     CREATE_DATASET = getattr(options, 'CREATE_DATASET')
     ADD_STATISTIC = getattr(options, 'ADD_STATISTIC')
 
-    TRAIN: int = 1
+    TRAIN: int = 0
+    TEST: int = 0
     BATCH_SIZE: int = 8
     LR: float = 0.001
     EPOCH: int = 1000
@@ -116,7 +140,7 @@ if __name__ == '__main__':
     error_flag = 0
 
     model_type = ModelType.Linear_3MONTH
-    criteria_type = CriteriaType.MSE
+    criteria_type = CriteriaType.HuberLoss
 
     for dir_ in [PATH_TO_SAVE_TARGETS, PATH_TO_PROJECTS, PATH_EXCEL_PROJECTS, PATH_NPY_PROJECTS,
                  SAVE_WEIGHT, DOP_DATA_PATH, PATH_TO_TARGETS_EXCEL]:
@@ -127,29 +151,13 @@ if __name__ == '__main__':
         create_stages(DOP_DATA_PATH)
         print_i(f'в папке {DOP_DATA_PATH} создался файл stages.xlsx')
 
-    if not os.path.exists((DOP_DATA_PATH+'all_contractors.xlsx')):
+    if not os.path.exists((DOP_DATA_PATH + 'all_contractors.xlsx')):
         create_contractors(DOP_DATA_PATH)
         print_i(f'в папке {DOP_DATA_PATH} создался файл all_contractors.xlsx')
 
-    # PATH_TO_TARGETS_EXCEL = 'data/targets_excel/*.xlsx'
-    # PATH_TO_SAVE_TARGETS = 'data'
-    # PATH_EXCEL_PROJECTS = 'data/features/'
-    # PATH_NPY_PROJECTS = 'data/prepred_train_data/'
-    # SAVE_WEIGHT = 'data/WEIGHTS/'
-    # DOP_DATA_PATH = 'data/dop_materials/'
-    # NEED_LOAD_FROM_DB: int = 1
-    # CONNECT: int = 1
-    # PROJ_ID: int = 45700
-    # RELOAD_DOPS: int = 0
-    # CONVERT: int = 0
-    # TARGET: int = 0
-    # TRAIN: int = 0
-    # CREATE_DATASET: int = 0
-    # BATCH_SIZE: int = 8
-
     # region LOAD data from db
     # if NEED_LOAD_FROM_DB:
-        # 0 CONNECTION to DB
+    # 0 CONNECTION to DB
     # region Connect to db
     if CONNECT:
         if DOWNLOAD_ALL_PROJECTS_FROM_DB:
@@ -233,14 +241,15 @@ if __name__ == '__main__':
     # region NEED CREATE TARGET
     if TARGET:
         print_i('TRY TO CREATE TARGET')
-        if len([name for name in os.listdir(PATH_TO_TARGETS_EXCEL) if os.path.isfile(os.path.join(PATH_TO_TARGETS_EXCEL, name))]) == 0:
+        if len([name for name in os.listdir(PATH_TO_TARGETS_EXCEL) if
+                os.path.isfile(os.path.join(PATH_TO_TARGETS_EXCEL, name))]) == 0:
             print_e(f"THERE IS NOT ANY FILE IN {PATH_TO_TARGETS_EXCEL}")
             error_flag = 1
         else:
             a = pd.DataFrame()
             year = 0
             i = 0
-            for i, path_ in enumerate(glob(PATH_TO_TARGETS_EXCEL+'*.xls')):
+            for i, path_ in enumerate(glob(PATH_TO_TARGETS_EXCEL + '*.xls')):
                 print_d(i, path_)
                 dataframe = pd.read_excel(path_)  # noqa
                 if os.path.splitext(path_)[-1] == '.xls':
@@ -257,7 +266,7 @@ if __name__ == '__main__':
                     a = pd.DataFrame(dat)
                 a = pd.concat([a, pd.DataFrame(dat)], axis=0, join='outer', ignore_index=True)
 
-            for ii, path_ in enumerate(glob(PATH_TO_TARGETS_EXCEL+'*.xlsx')):
+            for ii, path_ in enumerate(glob(PATH_TO_TARGETS_EXCEL + '*.xlsx')):
                 print_d(ii, path_)
                 dataframe = pd.read_excel(path_)  # noqa
                 if os.path.splitext(path_)[-1] == '.xlsx':
@@ -276,8 +285,8 @@ if __name__ == '__main__':
             print_i(f"SUCCESS CREATE TARGET.NPY IN {PATH_TO_SAVE_TARGETS}")
     # else:
     #     print_i(f'TAKE TARGET FROM {PATH_TO_SAVE_TARGETS}')
-        # targets = np.load(f'{PATH_TO_SAVE_TARGETS}/target_array.npy')
-        # targets = np.load(f'{PATH_TO_SAVE_TARGETS}')
+    # targets = np.load(f'{PATH_TO_SAVE_TARGETS}/target_array.npy')
+    # targets = np.load(f'{PATH_TO_SAVE_TARGETS}')
     # endregion
 
     # region Create DATASET
@@ -314,84 +323,71 @@ if __name__ == '__main__':
         else:
             print_e(f"THERE ARE NO ANY FILES IN {PATH_TO_PROJECTS}DATA.xlsx ")
             error_flag = 1
-
-    if not error_flag:
-        if ADD_STATISTIC:
-            Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'Stat_PD_DATA.xlsx')  # noqa
-        else:
-            Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA.xlsx')  # noqa
-
-        uniq_contr = Stat_PD_DATA['contr_id'].unique()
-        for i, contr in enumerate(uniq_contr):
-            Stat_ = Stat_PD_DATA.loc[Stat_PD_DATA['contr_id'] == contr]
-            if not Stat_.empty:
-                Stat_['contr_id'] = i
-        Stat_PD_DATA = Stat_
-        uniq_month = Stat_PD_DATA['month'].unique()
-        Stat_PD_DATA_m = pd.DataFrame()
-        for i, month in enumerate(uniq_month):
-            Stat_m = Stat_PD_DATA.loc[Stat_PD_DATA['month'] == month]
-            if month > 12:
-                Stat_m['month'] = month - 12
-                # Stat_PD_DATA.loc[Stat_PD_DATA['month'] == month] = month - 12
-            Stat_PD_DATA_m = Stat_PD_DATA_m.append(Stat_m)
-        Stat_PD_DATA = Stat_PD_DATA_m
-        test_PD_DATA = Stat_PD_DATA.loc[(Stat_PD_DATA['month'] == 7) | (Stat_PD_DATA['month'] == 8)]
-        test_PD_DATA = test_PD_DATA.loc[test_PD_DATA['year'] == 1]
-        train_PD_DATA = Stat_PD_DATA[~Stat_PD_DATA.index.isin(test_PD_DATA.index)]
-        train_PD_DATA = train_PD_DATA.sort_values(['year', 'month'])
-        test_PD_DATA = test_PD_DATA.sort_values(by=['year'])
-
-        # for lstm
-        print_i(f'ModelType = {model_type}')
-        if model_type is ModelType.LSTM:
-            # train_PD_DATA = train_PD_DATA.sort_values(by=['year'] and ['month'])
-            mech_res_dict = np.load(DOP_DATA_PATH + 'mech_res_dict.npy', allow_pickle=True).item()
-            train_dataset = PROJDataset_sequenses(train_PD_DATA, mech_res_dict)
-            test_dataset = PROJDataset_sequenses(test_PD_DATA, mech_res_dict)
-        elif model_type is ModelType.Linear or model_type is ModelType.Linear_3MONTH:
-            # for linear model
-            train_dataset = PROJDataset(train_PD_DATA)
-            test_dataset = PROJDataset(test_PD_DATA)
-        # elif model_type is ModelType.Linear_3MONTH:
-        #     # for linear model with statistic
-        #     train_dataset = PROJDataset(train_PD_DATA)
-        #     test_dataset = PROJDataset(test_PD_DATA)
-        # uniq_contr = Stat_PD_DATA['contr_id'].unique()
-        # for i, contr in enumerate(uniq_contr):
-        #     Stat_ = Stat_PD_DATA.loc[Stat_PD_DATA['contr_id'] == contr]
-        #     if not Stat_.empty:
-        #         Stat_['contr_id'] = i
-        # Stat_PD_DATA = Stat_
-
-
-
-        # train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=wandb.config['batch_size'], shuffle=False)
-        # test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=wandb.config['batch_size'], shuffle=False)
-        train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False)
-        test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
-
-        # for i, d in enumerate(train_loader):
-        #     print(i, d[0].shape, d[1].shape)
-        #     print(f'data = {d[0]}')
-        #     print(f'targets = {d[1]}')
-
     # endregion
 
     # region TRAIN model
     if TRAIN:
-        config = {
-            "learning_rate": LR,
-            "epochs": EPOCH,
-            "batch_size": BATCH_SIZE,
-            "num_workers": NW,
-            "weight_decay(l2)": L2,
-        }
+        if not error_flag:
+            if ADD_STATISTIC:
+                Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'Stat_PD_DATA.xlsx')  # noqa
+            else:
+                Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA.xlsx')  # noqa
 
-        model_param = Parameters(config, model_type, criteria_type)
-        # train_model(model_param.net, train_loader, test_loader, model_param.criteria, 0, model_param.optimizer, 0,
-        #             model_param.epochs, SAVE_WEIGHT, 'name')
-        train(model_param.net, train_loader, test_loader, model_param.criteria, 0, model_param.optimizer, 0,
-                    model_param.epochs, SAVE_WEIGHT, 'name')
-        print(f"Done. Model saved in folder [{SAVE_WEIGHT}]")
+            uniq_contr = Stat_PD_DATA['contr_id'].unique()
+            for i, contr in enumerate(uniq_contr):
+                Stat_ = Stat_PD_DATA.loc[Stat_PD_DATA['contr_id'] == contr]
+                if not Stat_.empty:
+                    Stat_['contr_id'] = i
+            Stat_PD_DATA = Stat_
+            uniq_month = Stat_PD_DATA['month'].unique()
+            Stat_PD_DATA_m = pd.DataFrame()
+            for i, month in enumerate(uniq_month):
+                Stat_m = Stat_PD_DATA.loc[Stat_PD_DATA['month'] == month]
+                if month > 12:
+                    Stat_m['month'] = month - 12
+                    # Stat_PD_DATA.loc[Stat_PD_DATA['month'] == month] = month - 12
+                Stat_PD_DATA_m = Stat_PD_DATA_m.append(Stat_m)
+            Stat_PD_DATA = Stat_PD_DATA_m
+
+            train_loader, test_loader = create_dataloaders_train_test(Stat_PD_DATA, model_type)
+
+            config = {
+                "learning_rate": LR,
+                "epochs": EPOCH,
+                "batch_size": BATCH_SIZE,
+                "num_workers": NW,
+                "weight_decay(l2)": L2,
+            }
+
+            model_param = Parameters(config, model_type, criteria_type)
+            # train_model(model_param.net, train_loader, test_loader, model_param.criteria, 0, model_param.optimizer, 0,
+            #             model_param.epochs, SAVE_WEIGHT, 'name')
+            model = train(model_param.net, train_loader, test_loader, model_param.criteria, 0, model_param.optimizer, 0,
+                          model_param.epochs, SAVE_WEIGHT, 'name')
+            torch.save(model.state_dict(), f"{SAVE_WEIGHT}model.pt")
+            print(f"Done. Model saved in folder [{SAVE_WEIGHT}]")
+    # endregion
+
+    # region TEST MODEL
+    # if TEST:
+    #     # предикт по всем данным
+    #     if model_type is ModelType.LSTM:
+    #         # train_PD_DATA = train_PD_DATA.sort_values(by=['year'] and ['month'])
+    #         mech_res_dict = np.load(DOP_DATA_PATH + 'mech_res_dict.npy', allow_pickle=True).item()
+    #         train_dataset = PROJDataset_sequenses(train_PD_DATA, mech_res_dict)
+    #         test_dataset = PROJDataset_sequenses(test_PD_DATA, mech_res_dict)
+    #     elif model_type is ModelType.Linear or model_type is ModelType.Linear_3MONTH:
+    #         # for linear model
+    #         train_dataset = PROJDataset(train_PD_DATA)
+    #         test_dataset = PROJDataset(test_PD_DATA)
+    #
+    #     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False)
+    #
+    #     feature_contractor_dict_ids = {v: k for k, v in feature_contractor_dict.items()}
+    #     stages_dict_ids = {v: k for k, v in stages_dict.items()}
+    #     mech_res_ids = {v: k for k, v in mech_res_dict.items()}
+    #     model_param = Parameters(config, model_type, criteria_type)
+    #     model_param.net.load_state_dict(torch.load(f"{SAVE_WEIGHT}model.pt"))
+
+    #     Вызов функций из test_model.py
     # endregion
