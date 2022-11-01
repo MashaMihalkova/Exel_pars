@@ -37,7 +37,7 @@ class Parameters:
             self.criteria = torch.nn.L1Loss(size_average=None, reduce=None, reduction='mean')
 
         self.optimizer = None
-        self.epochs: int = 10
+        self.epochs: int = 1000
 
         if config is not None:
             self.set_config(config)

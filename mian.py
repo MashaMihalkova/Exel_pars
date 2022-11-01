@@ -109,7 +109,7 @@ if __name__ == '__main__':
     TRAIN: int = 1
     BATCH_SIZE: int = 8
     LR: float = 0.001
-    EPOCH: int = 10
+    EPOCH: int = 1000
     NW: int = 0
     L2: float = 0.0001
     flag = 0
@@ -320,6 +320,22 @@ if __name__ == '__main__':
             Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'Stat_PD_DATA.xlsx')  # noqa
         else:
             Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA.xlsx')  # noqa
+
+        uniq_contr = Stat_PD_DATA['contr_id'].unique()
+        for i, contr in enumerate(uniq_contr):
+            Stat_ = Stat_PD_DATA.loc[Stat_PD_DATA['contr_id'] == contr]
+            if not Stat_.empty:
+                Stat_['contr_id'] = i
+        Stat_PD_DATA = Stat_
+        uniq_month = Stat_PD_DATA['month'].unique()
+        Stat_PD_DATA_m = pd.DataFrame()
+        for i, month in enumerate(uniq_month):
+            Stat_m = Stat_PD_DATA.loc[Stat_PD_DATA['month'] == month]
+            if month > 12:
+                Stat_m['month'] = month - 12
+                # Stat_PD_DATA.loc[Stat_PD_DATA['month'] == month] = month - 12
+            Stat_PD_DATA_m = Stat_PD_DATA_m.append(Stat_m)
+        Stat_PD_DATA = Stat_PD_DATA_m
         test_PD_DATA = Stat_PD_DATA.loc[(Stat_PD_DATA['month'] == 7) | (Stat_PD_DATA['month'] == 8)]
         test_PD_DATA = test_PD_DATA.loc[test_PD_DATA['year'] == 1]
         train_PD_DATA = Stat_PD_DATA[~Stat_PD_DATA.index.isin(test_PD_DATA.index)]
@@ -341,6 +357,14 @@ if __name__ == '__main__':
         #     # for linear model with statistic
         #     train_dataset = PROJDataset(train_PD_DATA)
         #     test_dataset = PROJDataset(test_PD_DATA)
+        # uniq_contr = Stat_PD_DATA['contr_id'].unique()
+        # for i, contr in enumerate(uniq_contr):
+        #     Stat_ = Stat_PD_DATA.loc[Stat_PD_DATA['contr_id'] == contr]
+        #     if not Stat_.empty:
+        #         Stat_['contr_id'] = i
+        # Stat_PD_DATA = Stat_
+
+
 
         # train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=wandb.config['batch_size'], shuffle=False)
         # test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=wandb.config['batch_size'], shuffle=False)
