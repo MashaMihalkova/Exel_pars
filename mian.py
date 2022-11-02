@@ -99,11 +99,11 @@ if __name__ == '__main__':
     parser.add_option('-i', '--PROJ_ID', type=str, help="PROJ_ID", default='44845')
 
     parser.add_option('-r', '--RELOAD_DOPS', type=int,
-                      help="NEED TO RELOAD_DOPS IF IT`S CHANGED OR IT DOESNT EXIST", default=0)
+                      help="NEED TO RELOAD_DOPS IF IT`S CHANGED OR IT DOESNT EXIST", default=1)
 
     parser.add_option('-v', '--CONVERT', type=int, help="CONVERT PROJECT TO NUMPY", default=0)
 
-    parser.add_option('-g', '--TARGET', type=int, help="NEED TO PARSING TARGETS", default=0)
+    parser.add_option('-g', '--TARGET', type=int, help="NEED TO PARSING TARGETS", default=1)
 
     parser.add_option('-a', '--CREATE_DATASET', type=int, help="CREATE_DATASET", default=1)
 
@@ -138,6 +138,14 @@ if __name__ == '__main__':
     L2: float = 0.0001
     flag = 0
     error_flag = 0
+    config = {
+        "learning_rate": LR,
+        "epochs": EPOCH,
+        "batch_size": BATCH_SIZE,
+        "num_workers": NW,
+        "weight_decay(l2)": L2,
+    }
+    num_column_fact = 17  # 17 - если хотим по omni, 13 - если по времени
 
     model_type = ModelType.Linear_3MONTH
     criteria_type = CriteriaType.HuberLoss
@@ -253,9 +261,9 @@ if __name__ == '__main__':
                 print_d(i, path_)
                 dataframe = pd.read_excel(path_)  # noqa
                 if os.path.splitext(path_)[-1] == '.xls':
-                    dat = parse_data_xls(dataframe, fact=13)
+                    dat = parse_data_xls(dataframe, fact=num_column_fact)
                 else:
-                    dat = parse_data(dataframe)
+                    dat = parse_data(dataframe, fact=num_column_fact)
                 # dat = parse_data_xls(dataframe)
 
                 year = int(dataframe.iloc[0, 2][14:18])
@@ -270,7 +278,7 @@ if __name__ == '__main__':
                 print_d(ii, path_)
                 dataframe = pd.read_excel(path_)  # noqa
                 if os.path.splitext(path_)[-1] == '.xlsx':
-                    dat = parse_data(dataframe)
+                    dat = parse_data(dataframe, fact=num_column_fact)
                 year = int(dataframe.iloc[0, 2][14:18])
                 month = int(dataframe.iloc[0, 2][11:13])
 
@@ -291,6 +299,8 @@ if __name__ == '__main__':
 
     # region Create DATASET
     if CREATE_DATASET:
+        # TODO: надо отредактировать контракторов и месяца (месяца сделать 12,
+        #  контракторов пронумеровать с 0 (сейчас есть один контрактор его ид=14, а дб 0)
         print_i('TRY TO CREATE DATASET')
         if error_flag:
             print_e(f'THERE IS NO target_array.npy IN {PATH_TO_SAVE_TARGETS}')
@@ -351,14 +361,6 @@ if __name__ == '__main__':
 
             train_loader, test_loader = create_dataloaders_train_test(Stat_PD_DATA, model_type)
 
-            config = {
-                "learning_rate": LR,
-                "epochs": EPOCH,
-                "batch_size": BATCH_SIZE,
-                "num_workers": NW,
-                "weight_decay(l2)": L2,
-            }
-
             model_param = Parameters(config, model_type, criteria_type)
             # train_model(model_param.net, train_loader, test_loader, model_param.criteria, 0, model_param.optimizer, 0,
             #             model_param.epochs, SAVE_WEIGHT, 'name')
@@ -369,25 +371,61 @@ if __name__ == '__main__':
     # endregion
 
     # region TEST MODEL
-    # if TEST:
-    #     # предикт по всем данным
-    #     if model_type is ModelType.LSTM:
-    #         # train_PD_DATA = train_PD_DATA.sort_values(by=['year'] and ['month'])
-    #         mech_res_dict = np.load(DOP_DATA_PATH + 'mech_res_dict.npy', allow_pickle=True).item()
-    #         train_dataset = PROJDataset_sequenses(train_PD_DATA, mech_res_dict)
-    #         test_dataset = PROJDataset_sequenses(test_PD_DATA, mech_res_dict)
-    #     elif model_type is ModelType.Linear or model_type is ModelType.Linear_3MONTH:
-    #         # for linear model
-    #         train_dataset = PROJDataset(train_PD_DATA)
-    #         test_dataset = PROJDataset(test_PD_DATA)
-    #
-    #     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False)
-    #
-    #     feature_contractor_dict_ids = {v: k for k, v in feature_contractor_dict.items()}
-    #     stages_dict_ids = {v: k for k, v in stages_dict.items()}
-    #     mech_res_ids = {v: k for k, v in mech_res_dict.items()}
-    #     model_param = Parameters(config, model_type, criteria_type)
-    #     model_param.net.load_state_dict(torch.load(f"{SAVE_WEIGHT}model.pt"))
+    if TEST:
+        # предикт по всем данным
+        if not error_flag:
+            if ADD_STATISTIC:
+                Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'Stat_PD_DATA.xlsx')  # noqa
+            else:
+                Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA.xlsx')  # noqa
 
-    #     Вызов функций из test_model.py
+            contr_id_real = list(Stat_PD_DATA['contr_id'].unique())
+            uniq_contr = Stat_PD_DATA['contr_id'].unique()
+            for i, contr in enumerate(uniq_contr):
+                Stat_ = Stat_PD_DATA.loc[Stat_PD_DATA['contr_id'] == contr]
+                if not Stat_.empty:
+                    Stat_['contr_id'] = i
+            Stat_PD_DATA = Stat_
+            contractor_id = list(Stat_PD_DATA['contr_id'].unique())
+            uniq_month = Stat_PD_DATA['month'].unique()
+            Stat_PD_DATA_m = pd.DataFrame()
+            for i, month in enumerate(uniq_month):
+                Stat_m = Stat_PD_DATA.loc[Stat_PD_DATA['month'] == month]
+                if month > 12:
+                    Stat_m['month'] = month - 12
+                    # Stat_PD_DATA.loc[Stat_PD_DATA['month'] == month] = month - 12
+                Stat_PD_DATA_m = Stat_PD_DATA_m.append(Stat_m)
+            Stat_PD_DATA = Stat_PD_DATA_m
+
+            train_loader, test_loader = create_dataloaders_train_test(Stat_PD_DATA, model_type)
+            feature_contractor_dict = np.load(DOP_DATA_PATH+'all_contractors.npy', allow_pickle=True).item()
+            stages_dict = np.load(DOP_DATA_PATH+'stages.npy', allow_pickle=True).item()
+            mech_res_dict = np.load(DOP_DATA_PATH+'mech_res_dict.npy', allow_pickle=True).item()
+            feature_contractor_dict_ids = {v: k for k, v in feature_contractor_dict.items()}
+            stages_dict_ids = {v: k for k, v in stages_dict.items()}
+            mech_res_ids = {v: k for k, v in mech_res_dict.items()}
+            model_param = Parameters(config, model_type, criteria_type)
+            model_param.net.load_state_dict(torch.load(f"{SAVE_WEIGHT}model.pt"))
+
+            # tech = [2, 5, 8, 14, 19, 29, 30, 32, 42, 44, 46, 48, 57, 65, 70, 74, 76, 77, 83, 101, 111, 112, 115, 125,
+            # 143, 157, 172, 209, 216, 234, 235]
+            tech = [14, 19, 29, 30, 32, 42, 44, 46, 48, 57, 65, 70, 74, 76, 77, 83, 101, 111, 112, 115, 125,
+                    143, 157, 172, 209, 216, 234, 235]
+
+            common_statist = []
+            project_id = 23
+            for ind, c in enumerate(contr_id_real):
+                for i in tech:
+                    print(i)
+                    dict_statist = get_predict(Stat_PD_DATA, feature_contractor_dict, stages_dict, mech_res_dict,
+                                               model_param.net, model_type, contractor_id=contractor_id[ind],
+                                               contr_id_real=c, project_id=project_id,
+                                               resource_id=i, print_result=False, plot_result=True)
+
+                    plt.show()
+                    if dict_statist != 0:
+                        common_statist.append(dict_statist)
+
+        # get_predict(model_param.net, contractor_id=1, project_id=4, resource_id=30, )
+
     # endregion

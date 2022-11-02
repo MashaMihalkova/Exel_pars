@@ -7,7 +7,7 @@ from Log.print_lib import *
 
 
 # xlsx parser - так как xlsx имеет другую структуру
-def parse_data(df):
+def parse_data(df, fact):
     data = []
     year = int(df.iloc[0, 2][14:18])
     month = int(df.iloc[0, 2][11:13])
@@ -29,8 +29,8 @@ def parse_data(df):
                                   'res_name': k, 'hours': v}])
 
                 # проверка на сумму машиночасов из словаря и из Экселя
-                assert round(sum(dict_res_name.values()), 0) == round(df.iloc[last_res_type_index, 13],
-                                                                      0), f'sum of machines = {sum(dict_res_name.values())} should be the same in Excel = {df.iloc[last_res_type_index, 13]}, last_resource_index ={last_res_type_index},current_index={ind}'
+                assert round(sum(dict_res_name.values()), 0) == round(df.iloc[last_res_type_index, fact],
+                                                                      0), f'sum of machines = {sum(dict_res_name.values())} should be the same in Excel = {df.iloc[last_res_type_index, fact]}, last_resource_index ={last_res_type_index},current_index={ind}'
                 # break
 
                 print('Parsing finished')
@@ -87,12 +87,12 @@ def parse_data(df):
                               'hours': v}])
 
                     # проверка на сумму машиночасов из словаря и из Экселя
-                    if pd.isna(df.iloc[last_res_type_index, 13]):
+                    if pd.isna(df.iloc[last_res_type_index, fact]):
                         print(
-                            f' Missed data in file (sum of resources): row = {last_res_type_index}, column= {13}: {df.iloc[last_res_type_index, 13]}')
+                            f' Missed data in file (sum of resources): row = {last_res_type_index}, column= {fact}: {df.iloc[last_res_type_index, fact]}')
                     else:
-                        assert round(sum(dict_res_name.values()), 0) == round(df.iloc[last_res_type_index, 13],
-                                                                              0), f'sum of machines = {sum(dict_res_name.values())} should be the same in Excel = {df.iloc[last_res_type_index, 13]}, {last_res_type_index},{ind}'
+                        assert round(sum(dict_res_name.values()), 0) == round(df.iloc[last_res_type_index, fact],
+                                                                              0), f'sum of machines = {sum(dict_res_name.values())} should be the same in Excel = {df.iloc[last_res_type_index, fact]}, {last_res_type_index},{ind}'
 
                     dict_res_name = dict()  # обнуляем словарь так как начинается другой тип машин
 
@@ -109,14 +109,14 @@ def parse_data(df):
             ## может присутствовать скобка в названии -->  ( len(re.findall(r'\(', i.lower()))>0 )
             ## и в названии больше одного слова
             if (stage_opened) & (res_type_opened) & (
-                    (not pd.isna(df.iloc[ind, 3])) or (len(re.findall(r'\(', i.lower())) > 0) or (len(i.split()) > 1)):
-                if pd.isna(df.iloc[ind, 13]): continue  # На случай если данных по машине нет
+                    (not pd.isna(df.iloc[ind, fact])) or (len(re.findall(r'\(', i.lower())) > 0) or (len(i.split()) > 1)):
+                if pd.isna(df.iloc[ind, fact]): continue  # На случай если данных по машине нет
 
                 if i not in dict_res_name.keys():  # 'res_name':'hours'
-                    dict_res_name[i] = df.iloc[ind, 13]
+                    dict_res_name[i] = df.iloc[ind, fact]
                 else:
                     # если такое значение уже есть в списке
-                    dict_res_name[i] += df.iloc[ind, 13]
+                    dict_res_name[i] += df.iloc[ind, fact]
     return data
 
 

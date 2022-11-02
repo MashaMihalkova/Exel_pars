@@ -70,6 +70,7 @@ def add_statistic(Data: pd.DataFrame) -> pd.DataFrame:
 
                 Data_.iloc[list(sort_res_pr_con.index.values), :] = sort_res_pr_con
     Data_ = Data_.drop('month_year', axis=1)
+    Data_ = Data_.set_index('proj_id')
     cols = list(Data_.columns)
     a, b, c, d = cols.index('target'), cols.index('m_1'), cols.index('m_2'), cols.index('m_3')
     cols[a], cols[b], cols[c], cols[d] = cols[b], cols[c], cols[d], cols[a]

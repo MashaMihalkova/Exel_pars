@@ -24,7 +24,7 @@ def create_dataset(projects, pd_tar):
     dict_data['res_id'] = []
     dict_data['target'] = []
     dict_pd = {'target': [], 'row': [], 'proj_id': []}
-    d = np.load('data_/whole_2021.xlsx')
+    # d = np.load('data_/whole_2021.xlsx')
     for p in projects:
         # if isinstance(p, np.ndarray):
         #     proj = np.load(p)
