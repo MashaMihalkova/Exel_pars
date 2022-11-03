@@ -22,9 +22,6 @@ class positive_weights_linear(nn.Module):
         return torch.matmul(self.weight[res_id.long()].exp(), input_x)
 
 
-from torch.autograd import Variable
-
-
 class predict_hours_net(nn.Module):
     """
         всего работ по нормам 373 шт. = "in_features" в слое "activity_dense"
@@ -128,7 +125,6 @@ class predict_hours_net_3MONTH(nn.Module):
         res_id = x[-4].long()
         last_3_month = x[-3:]
         contr_id = x[1].long()
-
 
         sum_of_activities = self.activity_dense(x[2:-6], res_id)
         sum_of_month = torch.sum(torch.relu(self.last_3_month.weight[0] * last_3_month))

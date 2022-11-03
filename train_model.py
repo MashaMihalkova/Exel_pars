@@ -105,7 +105,8 @@ def train(model, train_dataloader, val_dataloader, loss, loss_ls, optimizer, sch
 
             target = target[(features[:, -2] == 1) * (features[:, -3] > 5) == 0]
             features = features[(features[:, -2] == 1) * (features[:, -3] > 5) == 0]
-            if features.shape[0] == 0: pass
+            if features.shape[0] == 0:
+                pass
 
             for i in range(features.shape[0]):
                 pred = model(features[i])
@@ -139,8 +140,3 @@ def train(model, train_dataloader, val_dataloader, loss, loss_ls, optimizer, sch
             torch.save(model.state_dict(), f"{path_weigh_save}log_model_huber_05_loss{loss_i :.3f}.pt")
 
     return model
-
-
-# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# train()
-# print(f"Done. Model saved in folder [{path_weigh_save}]")

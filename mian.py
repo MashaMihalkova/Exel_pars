@@ -199,16 +199,6 @@ if __name__ == '__main__':
         df_stages = pd.read_excel(DOP_DATA_PATH + 'stages.xlsx')  # noqa
         stages_dict = df_stages.set_index('project_name').id.to_dict()
         np.save(DOP_DATA_PATH + 'stages_dict.npy', stages_dict, allow_pickle=True)
-
-        # feature_contractors = []
-        # for i, path in enumerate(glob(PATH_EXCEL_PROJECTS + '*.xlsx')):
-        #     print_d(i, path)
-        #     df = pd.read_excel(path)  # noqa
-        #     feature_contractors.extend(pd.unique(df.contractor_name))
-        #
-        # feature_contractors = list(pd.unique(feature_contractors))
-        # feature_contractor_dict = dict(zip(feature_contractors, range(len(feature_contractors))))
-        # np.save(DOP_DATA_PATH + 'feature_contractor_dict.npy', feature_contractor_dict)
         print_i('SUCCESS RELOADING')
     # endregion
 
@@ -219,20 +209,9 @@ if __name__ == '__main__':
         assert len([name for name in os.listdir(DOP_DATA_PATH) if
                     os.path.isfile(os.path.join(DOP_DATA_PATH, name))]) > 1, print_e(
             "Закинь данные в папку для доп материала")
-        # target_contractors_dict = np.load(DOP_DATA_PATH + 'feature_contractor_dict.npy', allow_pickle=True).item()
-        # feature_contractor_dict = np.load(DOP_DATA_PATH + 'feature_contractor_dict.npy', allow_pickle=True).item()
         feature_contractor_dict = np.load(DOP_DATA_PATH + 'all_contractors.npy', allow_pickle=True).item()
         mech_res_dict = np.load(DOP_DATA_PATH + 'mech_res_dict.npy', allow_pickle=True).item()
         stages_dict = np.load(DOP_DATA_PATH + 'stages_dict.npy', allow_pickle=True).item()
-        # if CONNECT and flag:
-        #     df['dt'] = df.dt.apply(lambda x: datetime.strptime(str(x), '%Y-%m-%d %H:%M:%S'))
-        #     df['year'] = df.dt.dt.year
-        #     df['month'] = df.dt.dt.month
-        #     df['res_id'] = df.resource_name.map(mech_res_dict)
-        #     df['contr_id'] = df.contractor_name.map(feature_contractor_dict)
-        #     prepare_features(df, PATH_EXCEL_PROJECTS + list(df['project_name'].unique())[0] + '.xlsx',
-        #                      save_path=PATH_NPY_PROJECTS, stages_dict=stages_dict)
-        # else:
         for i, path in enumerate(glob(PATH_EXCEL_PROJECTS + '*.xlsx')):
             print(i, path)
             df = pd.read_excel(path)  # noqa
@@ -269,7 +248,6 @@ if __name__ == '__main__':
                 year = int(dataframe.iloc[0, 2][14:18])
                 month = int(dataframe.iloc[0, 2][11:13])
 
-                # pd.DataFrame(dat).to_excel(f'{PATH_TO_SAVE_TARGETS}/{month}_{year}.xlsx')
                 if i == 0:
                     a = pd.DataFrame(dat)
                 a = pd.concat([a, pd.DataFrame(dat)], axis=0, join='outer', ignore_index=True)
@@ -282,19 +260,13 @@ if __name__ == '__main__':
                 year = int(dataframe.iloc[0, 2][14:18])
                 month = int(dataframe.iloc[0, 2][11:13])
 
-                # pd.DataFrame(dat).to_excel(f'{PATH_TO_SAVE_TARGETS}/{month}_{year}.xlsx')
                 if i == 0:
                     a = pd.DataFrame(dat)
                 a = pd.concat([a, pd.DataFrame(dat)], axis=0, join='outer', ignore_index=True)
 
             a.to_excel(f'{PATH_TO_SAVE_TARGETS}whole_{year}.xlsx')
-            # targets = pd.read_excel(f'{PATH_TO_SAVE_TARGETS}/whole_{year}.xlsx')  # noqa
             convert_target_to_npy(f'{PATH_TO_SAVE_TARGETS}whole_{year}.xlsx', DOP_DATA_PATH, PATH_TO_SAVE_TARGETS)
             print_i(f"SUCCESS CREATE TARGET.NPY IN {PATH_TO_SAVE_TARGETS}")
-    # else:
-    #     print_i(f'TAKE TARGET FROM {PATH_TO_SAVE_TARGETS}')
-    # targets = np.load(f'{PATH_TO_SAVE_TARGETS}/target_array.npy')
-    # targets = np.load(f'{PATH_TO_SAVE_TARGETS}')
     # endregion
 
     # region Create DATASET
@@ -326,7 +298,6 @@ if __name__ == '__main__':
             else:
                 print_e(f"ERROR WHEN TRY TO CREATE DATASET, BECAUSE THERE ARE NO FILES IN PATH_NPY_PROJECTS")
                 error_flag = 1
-            #     Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS+ 'DATA.xlsx')  # noqa
     else:
         if os.path.exists(f'{PATH_TO_PROJECTS}DATA.xlsx'):
             print_i(f'TAKE DATASET FROM {PATH_TO_PROJECTS}DATA.xlsx')
@@ -362,6 +333,7 @@ if __name__ == '__main__':
             train_loader, test_loader = create_dataloaders_train_test(Stat_PD_DATA, model_type)
 
             model_param = Parameters(config, model_type, criteria_type)
+
             # train_model(model_param.net, train_loader, test_loader, model_param.criteria, 0, model_param.optimizer, 0,
             #             model_param.epochs, SAVE_WEIGHT, 'name')
             model = train(model_param.net, train_loader, test_loader, model_param.criteria, 0, model_param.optimizer, 0,
@@ -407,11 +379,8 @@ if __name__ == '__main__':
             model_param = Parameters(config, model_type, criteria_type)
             model_param.net.load_state_dict(torch.load(f"{SAVE_WEIGHT}model.pt"))
 
-            # tech = [2, 5, 8, 14, 19, 29, 30, 32, 42, 44, 46, 48, 57, 65, 70, 74, 76, 77, 83, 101, 111, 112, 115, 125,
-            # 143, 157, 172, 209, 216, 234, 235]
-            tech = [14, 19, 29, 30, 32, 42, 44, 46, 48, 57, 65, 70, 74, 76, 77, 83, 101, 111, 112, 115, 125,
-                    143, 157, 172, 209, 216, 234, 235]
-
+            tech = [2, 5, 8, 14, 19, 29, 30, 32, 42, 44, 46, 48, 57, 65, 70, 74, 76, 77, 83, 101, 111, 112, 115, 125,
+            143, 157, 172, 209, 216, 234, 235]
             common_statist = []
             project_id = 23
             for ind, c in enumerate(contr_id_real):
@@ -425,7 +394,4 @@ if __name__ == '__main__':
                     plt.show()
                     if dict_statist != 0:
                         common_statist.append(dict_statist)
-
-        # get_predict(model_param.net, contractor_id=1, project_id=4, resource_id=30, )
-
     # endregion
