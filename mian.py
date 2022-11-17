@@ -1,5 +1,7 @@
 from targets_parsing.pars_targets import *
 from targets_parsing.convert_to_target_npy import *
+from targets_parsing.tracking_target_pars import *
+from sql_connection.extract_target_tracking_from_bd import *
 from sql_connection.queary_to_bd import *
 # from sql_connection.databese import *  # подключение через SQLAlchemy, не выполняте запрос...
 from sql_connection.extract_data_from_bd import sql_quary
@@ -11,7 +13,7 @@ from train_model import train_model, train
 from create_dop_materials.create_stages import *
 from create_dop_materials.create_contractors import *
 from create_dataset.converter_from_database_loader_to_npy import *
-from create_dataset.add_statistic_3month import add_statistic
+from create_dataset.add_statistic_3month import add_statistic_100percent, add_statistic_previous
 import optparse
 from MODEL.config import Parameters, ModelType, CriteriaType
 from Log.print_lib import *
@@ -69,7 +71,7 @@ def download_projects(_id: int) -> int:
 
 
 if __name__ == '__main__':
-
+# TODO: сделать предик и брать данные с бд!
     parser = optparse.OptionParser()
 
     parser.add_option('-l', '--DOWNLOAD_ALL_PROJECTS_FROM_DB', type=int,
@@ -99,11 +101,15 @@ if __name__ == '__main__':
     parser.add_option('-i', '--PROJ_ID', type=str, help="PROJ_ID", default='44845')
 
     parser.add_option('-r', '--RELOAD_DOPS', type=int,
-                      help="NEED TO RELOAD_DOPS IF IT`S CHANGED OR IT DOESNT EXIST", default=1)
+                      help="NEED TO RELOAD_DOPS IF IT`S CHANGED OR IT DOESNT EXIST", default=0)
 
     parser.add_option('-v', '--CONVERT', type=int, help="CONVERT PROJECT TO NUMPY", default=0)
 
-    parser.add_option('-g', '--TARGET', type=int, help="NEED TO PARSING TARGETS", default=1)
+    parser.add_option('-g', '--TARGET', type=int, help="NEED TO PARSING TARGETS", default=0)
+
+    parser.add_option('-e', '--TARGET_TRACKING', type=int, help="NEED TO PARSING TARGETS", default=1)
+
+    parser.add_option('-m', '--TARGET_CONNECT', type=int, help="NEED TO DOWNLOAD TARGETS TRACKING FROM DB", default=0)
 
     parser.add_option('-a', '--CREATE_DATASET', type=int, help="CREATE_DATASET", default=1)
 
@@ -126,11 +132,14 @@ if __name__ == '__main__':
     RELOAD_DOPS = getattr(options, 'RELOAD_DOPS')
     CONVERT = getattr(options, 'CONVERT')
     TARGET = getattr(options, 'TARGET')
+    TARGET_TRACKING = getattr(options, 'TARGET_TRACKING')
+    TARGET_CONNECT = getattr(options, 'TARGET_CONNECT')
     CREATE_DATASET = getattr(options, 'CREATE_DATASET')
     ADD_STATISTIC = getattr(options, 'ADD_STATISTIC')
 
-    TRAIN: int = 0
-    TEST: int = 0
+    TRAIN: int = 1
+    TEST: int = 1
+    previous = 1  # add statistic with previous = 1, add statistic with percent = 0
     BATCH_SIZE: int = 8
     LR: float = 0.001
     EPOCH: int = 1000
@@ -269,6 +278,23 @@ if __name__ == '__main__':
             print_i(f"SUCCESS CREATE TARGET.NPY IN {PATH_TO_SAVE_TARGETS}")
     # endregion
 
+    # region TARGET_TRACKING
+    if TARGET_TRACKING:
+        print_i('TRY TO CREATE TARGET_TRACKING')
+        # if TARGET_CONNECT:
+        #     print_i("TRY TO CONNECT TO THE DATABASE TO UPLOAD TARGETS TRACKING")
+        #     df = pd.read_sql_query(sql_quary_target(), cnxn_target)
+        #     df.to_excel(PATH_TO_SAVE_TARGETS+'omnicom_data.xlsx')
+        # else:
+        #     print_i("OPEN TARGETS TRACKING FILE omnicom_data.xlsx ")
+        #     df = pd.read_excel(PATH_TO_SAVE_TARGETS+'omnicom_data.xlsx')
+        # df = pd.read_excel(PATH_TO_SAVE_TARGETS+'whole_target.xlsx')
+        # tracking_target_pars(df, path_to_dop_materials='data/Needed_materials/', path_to_save=PATH_TO_SAVE_TARGETS)
+        convert_target_to_npy(f'{PATH_TO_SAVE_TARGETS}whole_target_hours_omni.xlsx', DOP_DATA_PATH,
+                              PATH_TO_SAVE_TARGETS, tracking=1)
+        print_i(f"SUCCESS CREATE whole_target_hours_omni.NPY IN {PATH_TO_SAVE_TARGETS}")
+    # endregion
+
     # region Create DATASET
     if CREATE_DATASET:
         # TODO: надо отредактировать контракторов и месяца (месяца сделать 12,
@@ -289,9 +315,14 @@ if __name__ == '__main__':
             PD_DATA = pd.DataFrame(dict_data)
             PD_DATA.to_excel(PATH_TO_PROJECTS + 'DATA.xlsx')
             if ADD_STATISTIC:
-                print_i('ADD 3 MONTH STATISTIC')
-                Stat_PD_DATA = add_statistic(PD_DATA)
-                Stat_PD_DATA.to_excel(PATH_TO_PROJECTS + 'Stat_PD_DATA.xlsx')
+                if previous:
+                    print_i('ADD 3 MONTH STATISTIC with previous')
+                    Stat_PD_DATA = add_statistic_previous(PD_DATA)
+                    Stat_PD_DATA.to_excel(PATH_TO_PROJECTS + 'Stat_PD_DATA_previous.xlsx')
+                else:
+                    print_i('ADD 3 MONTH STATISTIC with percent')
+                    Stat_PD_DATA = add_statistic_100percent(PD_DATA)
+                    Stat_PD_DATA.to_excel(PATH_TO_PROJECTS + 'Stat_PD_DATA_percent.xlsx')
         else:
             if error_flag:
                 print_e(f"ERROR WITH TARGETS WHEN TRY TO CREATE DATASET, BECAUSE error_flag = {error_flag} ")

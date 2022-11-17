@@ -47,7 +47,7 @@ def create_dataset(projects, pd_tar):
             contr_id = proj_id.loc[proj_id[CONTR_ID] == contr]
             if contr_id.shape[0] != 0:
                 for year in year_unique:
-                    if year == 0:
+                    if year == 2021.0:
                         y = 2021.0
                         # month_n = month
                     else:
@@ -75,10 +75,10 @@ def create_dataset(projects, pd_tar):
                     #                 month_n = month
                     #         year_id = month_id.loc[month_id[YEAR_T] == y]
                             if month_id.shape[0] != 0:
-                                if year:  # 2022
-                                    month_n = month_n + 12
-                                else:
-                                    month_n = month_n
+                                # if year:  # 2022
+                                #     month_n = month_n + 12
+                                # else:
+                                #     month_n = month_n
                                 for res in res_unique:
                                     res_id = month_id.loc[month_id[RESOURCE_T] == res]
                                     if res_id.shape[0] != 0:

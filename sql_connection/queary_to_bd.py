@@ -9,8 +9,14 @@ cnxn = pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server};Server='
                       ';pwd='+ password+';TrustServerCertificate=yes;Encrypt=yes')
 cursor = cnxn.cursor()
 
-
-
+server_target = '10.0.1.64,5432'
+database_target = 'db_track_torch'
+username_target = 'osm'
+password_target = 'geoserver'
+cnxn_target = pyodbc.connect('DRIVER={PostgreSQL Unicode};Server='
+                      +server_target+';Database='+database_target+';uid='+username_target+
+                      ';pwd='+ password_target+';TrustServerCertificate=yes;Encrypt=yes')
+cursor_target = cnxn_target.cursor()
 
 #
 # import csv

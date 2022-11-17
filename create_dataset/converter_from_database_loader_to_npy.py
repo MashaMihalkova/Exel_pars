@@ -11,8 +11,10 @@ def prepare_features(df, path, save_path, stages_dict):
 
     contr_list = pd.unique(df.contr_id)
     res_list = pd.unique(df.res_id)
-    month_ = 24
-    feature_array = np.zeros((len(contr_list), len(res_list), month_, 377), dtype=float)
+
+    month = 24
+    # month_ =
+    feature_array = np.zeros((len(contr_list), len(res_list), month, 377), dtype=float)
 
     for c in contr_list:
         # ищем позицию контрактора
@@ -35,12 +37,13 @@ def prepare_features(df, path, save_path, stages_dict):
 
                     # тут суммируем по нормам:
                     for i in df_res_month.groupby(by=['PO_id']):
-                        month = (y - 2021) * 12 + m
-                        feature_array[contr_position, res_position, month, norm_dict[i[0]]] = \
+                        month_ = (y - 2021) * 12 + m
+                        # month = m
+                        feature_array[contr_position, res_position, month_, norm_dict[i[0]]] = \
                             i[1].loc[:, 'act_reg_qty'].sum()
 
 
-                    sum_feature_array = np.around(feature_array[contr_position, res_position, month].sum(), 2)
+                    sum_feature_array = np.around(feature_array[contr_position, res_position, month_].sum(), 2)
                     sum_dataframe = np.around(df_res_month.act_reg_qty.sum(), 2)
 
                     # проверка все ли значения сохранили
@@ -48,18 +51,22 @@ def prepare_features(df, path, save_path, stages_dict):
                                                                        f'ресурс_id = {r},' \
                                                                        f'суммы часов sum_feature_array = {sum_feature_array},' \
                                                                        f'sum_dataframe = {sum_dataframe} должны быть одинаковыми'
-
-                    # записываем месяц 
-                    feature_array[contr_position, res_position, month, -3] = month
+                    if y == 2022:
+                        # записываем месяц
+                        feature_array[contr_position, res_position, month_, -3] = month_ - 12
+                    else:
+                        # записываем месяц
+                        feature_array[contr_position, res_position, month_, -3] = month_
 
                     # записываем год
-                    feature_array[contr_position, res_position, month, -2] = y - 2021
+                    # feature_array[contr_position, res_position, month, -2] = y - 2021
+                    feature_array[contr_position, res_position, month_, -2] = y
 
                     # записываем код техники
-                    feature_array[contr_position, res_position, month, -1] = r
+                    feature_array[contr_position, res_position, month_, -1] = r
 
                     # записываем контрактора
-                    feature_array[contr_position, res_position, month, 0] = c
+                    feature_array[contr_position, res_position, month_, 0] = c
 
         # проверка
         sum_dataframe = np.around(df.loc[(df.contr_id == c) & (df.mat_res_name != 'Стоимость'), 'act_reg_qty'].sum(), 2)

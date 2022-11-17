@@ -3,7 +3,7 @@ import numpy as np
 import re
 
 
-def convert_target_to_npy(target_xlsx: str = None, path_to_dop_materials: str = None, path_to_save: str = None) -> None:
+def convert_target_to_npy(target_xlsx: str, path_to_dop_materials: str, path_to_save: str, tracking: int = 0) -> None:
     targets = pd.DataFrame(pd.read_excel(f'{target_xlsx}'))
 
     mech_res_dict = np.load(path_to_dop_materials + 'mech_res_dict.npy', allow_pickle=True).item()
@@ -30,10 +30,18 @@ def convert_target_to_npy(target_xlsx: str = None, path_to_dop_materials: str = 
     targets['res_id'] = targets.res_name.map(mech_res_dict_updated)
 
     targets['proj_id'] = targets.stage.map(stages_dict.item())
-    target_df = targets.loc[:, ['proj_id', 'contr_id', 'month', 'year', 'res_id', 'hours']]
-    target_df.dropna(axis='index', inplace=True)
-    target_array = target_df.to_numpy(dtype=float)
-    np.save(f'{path_to_save}/target_array.npy', target_array, allow_pickle=True)
+
+    if tracking:
+
+        target_df = targets.loc[:, ['proj_id', 'contr_id', 'day', 'month', 'year', 'res_id', 'hours_omni']]
+        target_df.dropna(axis='index', inplace=True)
+        target_array = target_df.to_numpy(dtype=float)
+        np.save(f'{path_to_save}/whole_target_hours_omni.npy', target_array, allow_pickle=True)
+    else:
+        target_df = targets.loc[:, ['proj_id', 'contr_id', 'month', 'year', 'res_id', 'hours']]
+        target_df.dropna(axis='index', inplace=True)
+        target_array = target_df.to_numpy(dtype=float)
+        np.save(f'{path_to_save}/target_array.npy', target_array, allow_pickle=True)
 
 
 
