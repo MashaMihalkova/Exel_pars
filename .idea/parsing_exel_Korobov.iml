@@ -9,6 +9,7 @@
       <excludeFolder url="file://$MODULE_DIR$/data___" />
       <excludeFolder url="file://$MODULE_DIR$/data — копия" />
       <excludeFolder url="file://$MODULE_DIR$/data — копия (2)" />
+      <excludeFolder url="file://$MODULE_DIR$/data_omni" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

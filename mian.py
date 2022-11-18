@@ -71,7 +71,7 @@ def download_projects(_id: int) -> int:
 
 
 if __name__ == '__main__':
-# TODO: сделать предик и брать данные с бд!
+    # TODO: сделать предик, брав данные с бд!
     parser = optparse.OptionParser()
 
     parser.add_option('-l', '--DOWNLOAD_ALL_PROJECTS_FROM_DB', type=int,
@@ -111,9 +111,9 @@ if __name__ == '__main__':
 
     parser.add_option('-m', '--TARGET_CONNECT', type=int, help="NEED TO DOWNLOAD TARGETS TRACKING FROM DB", default=0)
 
-    parser.add_option('-a', '--CREATE_DATASET', type=int, help="CREATE_DATASET", default=1)
+    parser.add_option('-a', '--CREATE_DATASET', type=int, help="CREATE_DATASET", default=0)
 
-    parser.add_option('-z', '--ADD_STATISTIC', type=int, help="ADD_STATISTIC to dataset 3 month", default=1)
+    parser.add_option('-z', '--ADD_STATISTIC', type=int, help="ADD_STATISTIC to dataset 3 month", default=0)
 
     options, args = parser.parse_args()
     DOWNLOAD_ALL_PROJECTS_FROM_DB = getattr(options, 'DOWNLOAD_ALL_PROJECTS_FROM_DB')
@@ -227,9 +227,10 @@ if __name__ == '__main__':
             df['dt'] = df.dt.apply(lambda x: datetime.strptime(str(x), '%Y-%m-%d %H:%M:%S'))
             df['year'] = df.dt.dt.year
             df['month'] = df.dt.dt.month
+            df['day'] = df.dt.dt.day
             df['res_id'] = df.resource_name.map(mech_res_dict)
             df['contr_id'] = df.contractor_name.map(feature_contractor_dict)
-            prepare_features(df, path, save_path=PATH_NPY_PROJECTS, stages_dict=stages_dict)
+            prepare_features(df, path, save_path=PATH_NPY_PROJECTS, stages_dict=stages_dict, tracking=TARGET_TRACKING)
         print_i('SUCCESS CONVERT PROJECTS TO NPY')
     # endregion
     # endregion
@@ -279,20 +280,21 @@ if __name__ == '__main__':
     # endregion
 
     # region TARGET_TRACKING
-    if TARGET_TRACKING:
-        print_i('TRY TO CREATE TARGET_TRACKING')
-        # if TARGET_CONNECT:
-        #     print_i("TRY TO CONNECT TO THE DATABASE TO UPLOAD TARGETS TRACKING")
-        #     df = pd.read_sql_query(sql_quary_target(), cnxn_target)
-        #     df.to_excel(PATH_TO_SAVE_TARGETS+'omnicom_data.xlsx')
-        # else:
-        #     print_i("OPEN TARGETS TRACKING FILE omnicom_data.xlsx ")
-        #     df = pd.read_excel(PATH_TO_SAVE_TARGETS+'omnicom_data.xlsx')
-        # df = pd.read_excel(PATH_TO_SAVE_TARGETS+'whole_target.xlsx')
-        # tracking_target_pars(df, path_to_dop_materials='data/Needed_materials/', path_to_save=PATH_TO_SAVE_TARGETS)
-        convert_target_to_npy(f'{PATH_TO_SAVE_TARGETS}whole_target_hours_omni.xlsx', DOP_DATA_PATH,
-                              PATH_TO_SAVE_TARGETS, tracking=1)
-        print_i(f"SUCCESS CREATE whole_target_hours_omni.NPY IN {PATH_TO_SAVE_TARGETS}")
+    if TARGET:
+        if TARGET_TRACKING:
+            print_i('TRY TO CREATE TARGET_TRACKING')
+            if TARGET_CONNECT:
+                print_i("TRY TO CONNECT TO THE DATABASE TO UPLOAD TARGETS TRACKING")
+                df = pd.read_sql_query(sql_quary_target(), cnxn_target)
+                df.to_excel(PATH_TO_SAVE_TARGETS+'omnicom_data.xlsx')
+            else:
+                print_i("OPEN TARGETS TRACKING FILE omnicom_data.xlsx ")
+                df = pd.read_excel(PATH_TO_SAVE_TARGETS+'omnicom_data.xlsx')
+            # df = pd.read_excel(PATH_TO_SAVE_TARGETS+'whole_target.xlsx')
+            tracking_target_pars(df, path_to_dop_materials='data/Needed_materials/', path_to_save=PATH_TO_SAVE_TARGETS)
+            convert_target_to_npy(f'{PATH_TO_SAVE_TARGETS}whole_target_hours_omni.xlsx', DOP_DATA_PATH,
+                                  PATH_TO_SAVE_TARGETS, tracking=1)
+            print_i(f"SUCCESS CREATE whole_target_hours_omni.NPY IN {PATH_TO_SAVE_TARGETS}")
     # endregion
 
     # region Create DATASET
@@ -303,15 +305,20 @@ if __name__ == '__main__':
         if error_flag:
             print_e(f'THERE IS NO target_array.npy IN {PATH_TO_SAVE_TARGETS}')
         else:
-            targets = np.load(PATH_TO_SAVE_TARGETS + 'target_array.npy')
+            if TARGET_TRACKING:
+                targets = np.load(PATH_TO_SAVE_TARGETS + 'whole_target_hours_omni.npy')
+            else:
+                targets = np.load(PATH_TO_SAVE_TARGETS + 'target_array.npy')
             print_i(f'TAKE TARGET FROM {PATH_TO_SAVE_TARGETS}')
             PD_tar = pd.DataFrame(targets)  # 0/1-contr/proj, 2-month, 3- year, 4 - res, 5 - val
             if PD_tar.empty:
                 error_flag = 1
-
-        Projects = list(glob(PATH_NPY_PROJECTS + '/*.npy'))[0:]
+        if TARGET_TRACKING:
+            Projects = list(glob(PATH_NPY_PROJECTS + '/tracking/*.npy'))[0:]
+        else:
+            Projects = list(glob(PATH_NPY_PROJECTS + '/*.npy'))[0:]
         if len(Projects) > 0 and not error_flag:
-            dict_data = create_dataset(Projects, PD_tar)  # noqa
+            dict_data = create_dataset(Projects, PD_tar, tracking=TARGET_TRACKING)  # noqa
             PD_DATA = pd.DataFrame(dict_data)
             PD_DATA.to_excel(PATH_TO_PROJECTS + 'DATA.xlsx')
             if ADD_STATISTIC:
@@ -401,9 +408,9 @@ if __name__ == '__main__':
             Stat_PD_DATA = Stat_PD_DATA_m
 
             train_loader, test_loader = create_dataloaders_train_test(Stat_PD_DATA, model_type)
-            feature_contractor_dict = np.load(DOP_DATA_PATH+'all_contractors.npy', allow_pickle=True).item()
-            stages_dict = np.load(DOP_DATA_PATH+'stages.npy', allow_pickle=True).item()
-            mech_res_dict = np.load(DOP_DATA_PATH+'mech_res_dict.npy', allow_pickle=True).item()
+            feature_contractor_dict = np.load(DOP_DATA_PATH + 'all_contractors.npy', allow_pickle=True).item()
+            stages_dict = np.load(DOP_DATA_PATH + 'stages.npy', allow_pickle=True).item()
+            mech_res_dict = np.load(DOP_DATA_PATH + 'mech_res_dict.npy', allow_pickle=True).item()
             feature_contractor_dict_ids = {v: k for k, v in feature_contractor_dict.items()}
             stages_dict_ids = {v: k for k, v in stages_dict.items()}
             mech_res_ids = {v: k for k, v in mech_res_dict.items()}
@@ -411,7 +418,7 @@ if __name__ == '__main__':
             model_param.net.load_state_dict(torch.load(f"{SAVE_WEIGHT}model.pt"))
 
             tech = [2, 5, 8, 14, 19, 29, 30, 32, 42, 44, 46, 48, 57, 65, 70, 74, 76, 77, 83, 101, 111, 112, 115, 125,
-            143, 157, 172, 209, 216, 234, 235]
+                    143, 157, 172, 209, 216, 234, 235]
             common_statist = []
             project_id = 23
             for ind, c in enumerate(contr_id_real):
