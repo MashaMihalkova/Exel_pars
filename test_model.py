@@ -57,21 +57,29 @@ def show_results(y_true, y_pred, sum_plans, name=None):
 
 
 def get_predict(PD_DATA, feature_contractor_dict_ids, stages_dict_ids, mech_res_ids, model, model_type, contractor_id,
-                contr_id_real, project_id, resource_id, print_result=False, plot_result=True):
+                contr_id_real, project_id, resource_id, print_result=False, plot_result=True, tracking: int = 0):
     a = list(map(str, range(0, 373)))
     b = ['proj_id', 'contr_id']
     b.extend(a)
-    if model_type is ModelType.Linear_3MONTH:
-        b.extend(['month', 'year', 'res_id', 'm_1', 'm_2', 'm_3', 'target'])
+    if tracking:
+        b.extend(['day', 'month', 'year', 'res_id', 'target'])
     else:
-        b.extend(['month', 'year', 'res_id', 'target'])
+        if model_type is ModelType.Linear_3MONTH:
+            b.extend(['month', 'year', 'res_id', 'm_1', 'm_2', 'm_3', 'target'])
+        else:
+            b.extend(['month', 'year', 'res_id', 'target'])
     df_for_predict = PD_DATA.loc[
         (PD_DATA.contr_id == contractor_id) & (PD_DATA.proj_id == project_id) & (PD_DATA.res_id == resource_id), b]
 
     features_for_predict = torch.tensor(df_for_predict.iloc[:, :-1].values).to(torch.float)
     target = df_for_predict.iloc[:, -1].values
-
-    plans = df_for_predict.iloc[:, 2:-4]
+    if tracking:
+        plans = df_for_predict.iloc[:, 2:-1]
+    else:
+        if model_type is ModelType.Linear_3MONTH:
+            plans = df_for_predict.iloc[:, 2:-4]
+        else:
+            plans = df_for_predict.iloc[:, 2:-1]
 
     sum_plans = plans.sum(axis=1)
 

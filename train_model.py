@@ -94,26 +94,35 @@ def train_model(model, train_dataloader, val_dataloader, loss, loss_ls, optimize
 
 
 def train(model, train_dataloader, val_dataloader, loss, loss_ls, optimizer, scheduler, num_epochs,
-          path_weigh_save, model_name: str):
+          path_weigh_save, device, model_name: str):
     min_loss = 100
     for epoch in range(num_epochs):
-        for features, target in train_dataloader:
+        # for features, target in train_dataloader:
+        for j, (features, target) in enumerate(train_dataloader):
             optimizer.zero_grad()
             preds = torch.tensor([])
             features = features.to(torch.float)
+            features = features.to(device)
             target = target.to(torch.float)
+            target = target.to(device)
+            model = model.to(device)
 
-            target = target[(features[:, -2] == 1) * (features[:, -3] > 5) == 0]
-            features = features[(features[:, -2] == 1) * (features[:, -3] > 5) == 0]
-            if features.shape[0] == 0:
-                pass
+            # target = target[(features[:, -2] == 1) * (features[:, -3] > 5) == 0]
+            # features = features[(features[:, -2] == 1) * (features[:, -3] > 5) == 0]
+            # if features.shape[0] == 0:
+            #     continue
+                # pass
+
 
             for i in range(features.shape[0]):
                 pred = model(features[i])
-                preds = torch.cat((preds, pred.view(-1, 1)), 0)
+                # preds
+                preds = torch.cat((preds.to(device), pred.view(-1, 1)), 0)
 
             loss_ = loss(preds, target)
             loss_i = loss_.item()
+            if preds.shape[0] <= 2:
+                print(f'loss = {loss_}, pred = {preds.shape}, target = {target.shape}')
             loss_.backward()
             optimizer.step()
 
@@ -124,7 +133,10 @@ def train(model, train_dataloader, val_dataloader, loss, loss_ls, optimizer, sch
         for features, target in train_dataloader:
 
             features = features.to(torch.float)
+            features = features.to(device)
+            target = target.to(device)
             targets.extend(target.view(-1).tolist())
+            # targets = targets.to(device)
 
             for i in range(features.shape[0]):
                 with torch.no_grad():

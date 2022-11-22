@@ -1,3 +1,5 @@
+import torch.cuda
+
 from targets_parsing.pars_targets import *
 from targets_parsing.convert_to_target_npy import *
 from targets_parsing.tracking_target_pars import *
@@ -137,7 +139,7 @@ if __name__ == '__main__':
     CREATE_DATASET = getattr(options, 'CREATE_DATASET')
     ADD_STATISTIC = getattr(options, 'ADD_STATISTIC')
 
-    TRAIN: int = 1
+    TRAIN: int = 0
     TEST: int = 1
     previous = 1  # add statistic with previous = 1, add statistic with percent = 0
     BATCH_SIZE: int = 8
@@ -153,10 +155,13 @@ if __name__ == '__main__':
         "batch_size": BATCH_SIZE,
         "num_workers": NW,
         "weight_decay(l2)": L2,
+
     }
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     num_column_fact = 17  # 17 - если хотим по omni, 13 - если по времени
 
-    model_type = ModelType.Linear_3MONTH
+    # model_type = ModelType.Linear_3MONTH
+    model_type = ModelType.Linear
     criteria_type = CriteriaType.HuberLoss
 
     for dir_ in [PATH_TO_SAVE_TARGETS, PATH_TO_PROJECTS, PATH_EXCEL_PROJECTS, PATH_NPY_PROJECTS,
@@ -320,6 +325,9 @@ if __name__ == '__main__':
         if len(Projects) > 0 and not error_flag:
             dict_data = create_dataset(Projects, PD_tar, tracking=TARGET_TRACKING)  # noqa
             PD_DATA = pd.DataFrame(dict_data)
+            # TODO: удалить первую колонку если она не proj_id
+            # PD_DATA = PD_DATA.drop()
+            #
             PD_DATA.to_excel(PATH_TO_PROJECTS + 'DATA.xlsx')
             if ADD_STATISTIC:
                 if previous:
@@ -346,11 +354,12 @@ if __name__ == '__main__':
 
     # region TRAIN model
     if TRAIN:
+        print(torch.cuda.is_available())
         if not error_flag:
             if ADD_STATISTIC:
                 Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'Stat_PD_DATA.xlsx')  # noqa
             else:
-                Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA.xlsx')  # noqa
+                Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA_.xlsx')  # noqa
 
             uniq_contr = Stat_PD_DATA['contr_id'].unique()
             for i, contr in enumerate(uniq_contr):
@@ -358,24 +367,40 @@ if __name__ == '__main__':
                 if not Stat_.empty:
                     Stat_['contr_id'] = i
             Stat_PD_DATA = Stat_
+
             uniq_month = Stat_PD_DATA['month'].unique()
             Stat_PD_DATA_m = pd.DataFrame()
             for i, month in enumerate(uniq_month):
                 Stat_m = Stat_PD_DATA.loc[Stat_PD_DATA['month'] == month]
+                Stat_m['month'] = month - 1
                 if month > 12:
                     Stat_m['month'] = month - 12
                     # Stat_PD_DATA.loc[Stat_PD_DATA['month'] == month] = month - 12
                 Stat_PD_DATA_m = Stat_PD_DATA_m.append(Stat_m)
             Stat_PD_DATA = Stat_PD_DATA_m
 
+            uniq_year = Stat_PD_DATA['year'].unique()
+            Stat_PD_DATA_y = pd.DataFrame()
+            for i, year in enumerate(uniq_year):
+                Stat_y = Stat_PD_DATA.loc[Stat_PD_DATA['year'] == year]
+                if year == 2022:
+                    Stat_y['year'] = 1
+                else:
+                    Stat_y['year'] = 0
+                    # Stat_PD_DATA.loc[Stat_PD_DATA['month'] == month] = month - 12
+                Stat_PD_DATA_y = Stat_PD_DATA_y.append(Stat_y)
+            Stat_PD_DATA = Stat_PD_DATA_y
+
             train_loader, test_loader = create_dataloaders_train_test(Stat_PD_DATA, model_type)
 
             model_param = Parameters(config, model_type, criteria_type)
+            model_param.net.load_state_dict(torch.load(
+                'data/WEIGHTS/log_model_huber_05_epoch_500_loss_69_mae_547.pt'))
 
             # train_model(model_param.net, train_loader, test_loader, model_param.criteria, 0, model_param.optimizer, 0,
             #             model_param.epochs, SAVE_WEIGHT, 'name')
             model = train(model_param.net, train_loader, test_loader, model_param.criteria, 0, model_param.optimizer, 0,
-                          model_param.epochs, SAVE_WEIGHT, 'name')
+                          model_param.epochs, SAVE_WEIGHT, device, 'name')
             torch.save(model.state_dict(), f"{SAVE_WEIGHT}model.pt")
             print(f"Done. Model saved in folder [{SAVE_WEIGHT}]")
     # endregion
@@ -383,11 +408,37 @@ if __name__ == '__main__':
     # region TEST MODEL
     if TEST:
         # предикт по всем данным
+        # if not error_flag:
+        #     if ADD_STATISTIC:
+        #         Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'Stat_PD_DATA.xlsx')  # noqa
+        #     else:
+        #         Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA.xlsx')  # noqa
+        #
+        #     contr_id_real = list(Stat_PD_DATA['contr_id'].unique())
+        #     uniq_contr = Stat_PD_DATA['contr_id'].unique()
+        #     for i, contr in enumerate(uniq_contr):
+        #         Stat_ = Stat_PD_DATA.loc[Stat_PD_DATA['contr_id'] == contr]
+        #         if not Stat_.empty:
+        #             Stat_['contr_id'] = i
+        #     Stat_PD_DATA = Stat_
+        #     contractor_id = list(Stat_PD_DATA['contr_id'].unique())
+        #     uniq_month = Stat_PD_DATA['month'].unique()
+        #     Stat_PD_DATA_m = pd.DataFrame()
+        #     for i, month in enumerate(uniq_month):
+        #         Stat_m = Stat_PD_DATA.loc[Stat_PD_DATA['month'] == month]
+        #         if month > 12:
+        #             Stat_m['month'] = month - 12
+        #             # Stat_PD_DATA.loc[Stat_PD_DATA['month'] == month] = month - 12
+        #         Stat_PD_DATA_m = Stat_PD_DATA_m.append(Stat_m)
+        #     Stat_PD_DATA = Stat_PD_DATA_m
+        #
+        #     train_loader, test_loader = create_dataloaders_train_test(Stat_PD_DATA, model_type)
+        print(torch.cuda.is_available())
         if not error_flag:
             if ADD_STATISTIC:
                 Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'Stat_PD_DATA.xlsx')  # noqa
             else:
-                Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA.xlsx')  # noqa
+                Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA_.xlsx')  # noqa
 
             contr_id_real = list(Stat_PD_DATA['contr_id'].unique())
             uniq_contr = Stat_PD_DATA['contr_id'].unique()
@@ -397,17 +448,35 @@ if __name__ == '__main__':
                     Stat_['contr_id'] = i
             Stat_PD_DATA = Stat_
             contractor_id = list(Stat_PD_DATA['contr_id'].unique())
+
             uniq_month = Stat_PD_DATA['month'].unique()
             Stat_PD_DATA_m = pd.DataFrame()
             for i, month in enumerate(uniq_month):
                 Stat_m = Stat_PD_DATA.loc[Stat_PD_DATA['month'] == month]
+                Stat_m['month'] = month - 1
                 if month > 12:
                     Stat_m['month'] = month - 12
                     # Stat_PD_DATA.loc[Stat_PD_DATA['month'] == month] = month - 12
                 Stat_PD_DATA_m = Stat_PD_DATA_m.append(Stat_m)
             Stat_PD_DATA = Stat_PD_DATA_m
 
+            uniq_year = Stat_PD_DATA['year'].unique()
+            Stat_PD_DATA_y = pd.DataFrame()
+            for i, year in enumerate(uniq_year):
+                Stat_y = Stat_PD_DATA.loc[Stat_PD_DATA['year'] == year]
+                if year == 2022:
+                    Stat_y['year'] = 1
+                else:
+                    Stat_y['year'] = 0
+                    # Stat_PD_DATA.loc[Stat_PD_DATA['month'] == month] = month - 12
+                Stat_PD_DATA_y = Stat_PD_DATA_y.append(Stat_y)
+            Stat_PD_DATA = Stat_PD_DATA_y
+
             train_loader, test_loader = create_dataloaders_train_test(Stat_PD_DATA, model_type)
+
+            # model_param = Parameters(config, model_type, criteria_type)
+            
+
             feature_contractor_dict = np.load(DOP_DATA_PATH + 'all_contractors.npy', allow_pickle=True).item()
             stages_dict = np.load(DOP_DATA_PATH + 'stages.npy', allow_pickle=True).item()
             mech_res_dict = np.load(DOP_DATA_PATH + 'mech_res_dict.npy', allow_pickle=True).item()
@@ -415,7 +484,9 @@ if __name__ == '__main__':
             stages_dict_ids = {v: k for k, v in stages_dict.items()}
             mech_res_ids = {v: k for k, v in mech_res_dict.items()}
             model_param = Parameters(config, model_type, criteria_type)
-            model_param.net.load_state_dict(torch.load(f"{SAVE_WEIGHT}model.pt"))
+            # model_param.net.load_state_dict(torch.load(
+            #     'data/WEIGHTS/log_model_huber_05_loss13740.948.pt'))
+            model_param.net.load_state_dict(torch.load(f"{SAVE_WEIGHT}log_model_huber_05_loss13740.948.pt"))
 
             tech = [2, 5, 8, 14, 19, 29, 30, 32, 42, 44, 46, 48, 57, 65, 70, 74, 76, 77, 83, 101, 111, 112, 115, 125,
                     143, 157, 172, 209, 216, 234, 235]
@@ -427,7 +498,7 @@ if __name__ == '__main__':
                     dict_statist = get_predict(Stat_PD_DATA, feature_contractor_dict, stages_dict, mech_res_dict,
                                                model_param.net, model_type, contractor_id=contractor_id[ind],
                                                contr_id_real=c, project_id=project_id,
-                                               resource_id=i, print_result=False, plot_result=True)
+                                               resource_id=i, print_result=False, plot_result=True, tracking=1)
 
                     plt.show()
                     if dict_statist != 0:

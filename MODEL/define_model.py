@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.cuda
 
 
 class positive_weights_linear(nn.Module):
@@ -44,11 +45,11 @@ class predict_hours_net(nn.Module):
         self.proj_dense = torch.nn.Linear(in_features=23, out_features=1, bias=False)
         self.contractor_dense = torch.nn.Linear(in_features=4, out_features=1, bias=False)
         self.year_dense = torch.nn.Linear(in_features=2, out_features=1, bias=True)
-        self.month_dense = torch.nn.Linear(in_features=13, out_features=1, bias=False)
+        self.month_dense = torch.nn.Linear(in_features=12, out_features=1, bias=False)
 
     def forward(self, x):
         # умножили на матрицу весов
-        sum_of_activities = self.activity_dense(x[2:-3], x[-1].long())
+        sum_of_activities = self.activity_dense(x[2:-4], x[-1].long())
 
         # умножили на коэф месяца
         sum_of_activities_month = self.month_dense.weight[0, x[-3].long()] * sum_of_activities
