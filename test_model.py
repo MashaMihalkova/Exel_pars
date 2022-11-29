@@ -46,7 +46,7 @@ from MODEL.config import ModelType
 def show_results(y_true, y_pred, sum_plans, name=None):
     plt.plot(y_true, label='Целевое значение')
     plt.plot(y_pred, label='Прогноз ИИ модели', color='orange')
-    plt.plot(sum_plans, label='Плановое значение Primavera', color='g')
+    # plt.plot(sum_plans, label='Плановое значение Primavera', color='g')
 
     plt.grid()
     plt.legend(loc='best')

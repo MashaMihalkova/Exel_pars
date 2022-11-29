@@ -12,6 +12,7 @@ from glob import glob
 from train_model import train_model, train
 # from wand_config.config import *
 # from datetime import datetime
+from create_dop_materials.status_tech import *
 from create_dop_materials.create_stages import *
 from create_dop_materials.create_contractors import *
 from create_dataset.converter_from_database_loader_to_npy import *
@@ -139,12 +140,21 @@ if __name__ == '__main__':
     CREATE_DATASET = getattr(options, 'CREATE_DATASET')
     ADD_STATISTIC = getattr(options, 'ADD_STATISTIC')
 
-    TRAIN: int = 0
-    TEST: int = 1
+    TRAIN: int = 1
+    TEST: int = 0
+
+    avarage_hours = 1  # усреднить показания с двигателя omni по часам ( т е либо 10 либо 24 часа отрабатывала техника),
+                       # чтобы избавиться от шума
+    # дополнительный файл со статусами из КА
+    STATUS_TECH = 0  # переименование ид IDINTROBJ в объект.
+    PATH_TO_STATUS = 'data/status_tech/tech_status.xlsx'
+    PATH_TO_ID_INTROBJ = 'data/status_tech/IDINTROBJ_id.xlsx'
+    PATH_TO_SAVE_STATUS = 'data/status_tech/RENAME_IDINTROBJ.xlsx'
+
     previous = 1  # add statistic with previous = 1, add statistic with percent = 0
     BATCH_SIZE: int = 8
     LR: float = 0.001
-    EPOCH: int = 1000
+    EPOCH: int = 500
     NW: int = 0
     L2: float = 0.0001
     flag = 0
@@ -242,46 +252,47 @@ if __name__ == '__main__':
 
     # region NEED CREATE TARGET
     if TARGET:
-        print_i('TRY TO CREATE TARGET')
-        if len([name for name in os.listdir(PATH_TO_TARGETS_EXCEL) if
-                os.path.isfile(os.path.join(PATH_TO_TARGETS_EXCEL, name))]) == 0:
-            print_e(f"THERE IS NOT ANY FILE IN {PATH_TO_TARGETS_EXCEL}")
-            error_flag = 1
-        else:
-            a = pd.DataFrame()
-            year = 0
-            i = 0
-            for i, path_ in enumerate(glob(PATH_TO_TARGETS_EXCEL + '*.xls')):
-                print_d(i, path_)
-                dataframe = pd.read_excel(path_)  # noqa
-                if os.path.splitext(path_)[-1] == '.xls':
-                    dat = parse_data_xls(dataframe, fact=num_column_fact)
-                else:
-                    dat = parse_data(dataframe, fact=num_column_fact)
-                # dat = parse_data_xls(dataframe)
+        if not TARGET_TRACKING:
+            print_i('TRY TO CREATE TARGET')
+            if len([name for name in os.listdir(PATH_TO_TARGETS_EXCEL) if
+                    os.path.isfile(os.path.join(PATH_TO_TARGETS_EXCEL, name))]) == 0:
+                print_e(f"THERE IS NOT ANY FILE IN {PATH_TO_TARGETS_EXCEL}")
+                error_flag = 1
+            else:
+                a = pd.DataFrame()
+                year = 0
+                i = 0
+                for i, path_ in enumerate(glob(PATH_TO_TARGETS_EXCEL + '*.xls')):
+                    print_d(i, path_)
+                    dataframe = pd.read_excel(path_)  # noqa
+                    if os.path.splitext(path_)[-1] == '.xls':
+                        dat = parse_data_xls(dataframe, fact=num_column_fact)
+                    else:
+                        dat = parse_data(dataframe, fact=num_column_fact)
+                    # dat = parse_data_xls(dataframe)
 
-                year = int(dataframe.iloc[0, 2][14:18])
-                month = int(dataframe.iloc[0, 2][11:13])
+                    year = int(dataframe.iloc[0, 2][14:18])
+                    month = int(dataframe.iloc[0, 2][11:13])
 
-                if i == 0:
-                    a = pd.DataFrame(dat)
-                a = pd.concat([a, pd.DataFrame(dat)], axis=0, join='outer', ignore_index=True)
+                    if i == 0:
+                        a = pd.DataFrame(dat)
+                    a = pd.concat([a, pd.DataFrame(dat)], axis=0, join='outer', ignore_index=True)
 
-            for ii, path_ in enumerate(glob(PATH_TO_TARGETS_EXCEL + '*.xlsx')):
-                print_d(ii, path_)
-                dataframe = pd.read_excel(path_)  # noqa
-                if os.path.splitext(path_)[-1] == '.xlsx':
-                    dat = parse_data(dataframe, fact=num_column_fact)
-                year = int(dataframe.iloc[0, 2][14:18])
-                month = int(dataframe.iloc[0, 2][11:13])
+                for ii, path_ in enumerate(glob(PATH_TO_TARGETS_EXCEL + '*.xlsx')):
+                    print_d(ii, path_)
+                    dataframe = pd.read_excel(path_)  # noqa
+                    if os.path.splitext(path_)[-1] == '.xlsx':
+                        dat = parse_data(dataframe, fact=num_column_fact)
+                    year = int(dataframe.iloc[0, 2][14:18])
+                    month = int(dataframe.iloc[0, 2][11:13])
 
-                if i == 0:
-                    a = pd.DataFrame(dat)
-                a = pd.concat([a, pd.DataFrame(dat)], axis=0, join='outer', ignore_index=True)
+                    if i == 0:
+                        a = pd.DataFrame(dat)
+                    a = pd.concat([a, pd.DataFrame(dat)], axis=0, join='outer', ignore_index=True)
 
-            a.to_excel(f'{PATH_TO_SAVE_TARGETS}whole_{year}.xlsx')
-            convert_target_to_npy(f'{PATH_TO_SAVE_TARGETS}whole_{year}.xlsx', DOP_DATA_PATH, PATH_TO_SAVE_TARGETS)
-            print_i(f"SUCCESS CREATE TARGET.NPY IN {PATH_TO_SAVE_TARGETS}")
+                a.to_excel(f'{PATH_TO_SAVE_TARGETS}whole_{year}.xlsx')
+                convert_target_to_npy(f'{PATH_TO_SAVE_TARGETS}whole_{year}.xlsx', DOP_DATA_PATH, PATH_TO_SAVE_TARGETS)
+                print_i(f"SUCCESS CREATE TARGET.NPY IN {PATH_TO_SAVE_TARGETS}")
     # endregion
 
     # region TARGET_TRACKING
@@ -291,14 +302,20 @@ if __name__ == '__main__':
             if TARGET_CONNECT:
                 print_i("TRY TO CONNECT TO THE DATABASE TO UPLOAD TARGETS TRACKING")
                 df = pd.read_sql_query(sql_quary_target(), cnxn_target)
-                df.to_excel(PATH_TO_SAVE_TARGETS+'omnicom_data.xlsx')
+                df.to_excel(PATH_TO_SAVE_TARGETS + 'omnicom_data.xlsx')
             else:
                 print_i("OPEN TARGETS TRACKING FILE omnicom_data.xlsx ")
-                df = pd.read_excel(PATH_TO_SAVE_TARGETS+'omnicom_data.xlsx')
-            # df = pd.read_excel(PATH_TO_SAVE_TARGETS+'whole_target.xlsx')
-            tracking_target_pars(df, path_to_dop_materials='data/Needed_materials/', path_to_save=PATH_TO_SAVE_TARGETS)
-            convert_target_to_npy(f'{PATH_TO_SAVE_TARGETS}whole_target_hours_omni.xlsx', DOP_DATA_PATH,
-                                  PATH_TO_SAVE_TARGETS, tracking=1)
+                df = pd.read_excel(PATH_TO_SAVE_TARGETS + 'omni_data.xlsx')
+                # df = pd.read_excel(PATH_TO_SAVE_TARGETS + 'omnicom_data.xlsx')
+
+            # tracking_target_pars(df, path_to_dop_materials='data/Needed_materials/', path_to_save=PATH_TO_SAVE_TARGETS,
+            #                      avarage_hours=avarage_hours)
+            if avarage_hours:
+                convert_target_to_npy(f'{PATH_TO_SAVE_TARGETS}whole_target_hours_omni_10-24.xlsx', DOP_DATA_PATH,
+                                      PATH_TO_SAVE_TARGETS, tracking=1, avarage_hours=avarage_hours)
+            else:
+                convert_target_to_npy(f'{PATH_TO_SAVE_TARGETS}whole_target_hours_omni.xlsx', DOP_DATA_PATH,
+                                      PATH_TO_SAVE_TARGETS, tracking=1)
             print_i(f"SUCCESS CREATE whole_target_hours_omni.NPY IN {PATH_TO_SAVE_TARGETS}")
     # endregion
 
@@ -311,7 +328,10 @@ if __name__ == '__main__':
             print_e(f'THERE IS NO target_array.npy IN {PATH_TO_SAVE_TARGETS}')
         else:
             if TARGET_TRACKING:
-                targets = np.load(PATH_TO_SAVE_TARGETS + 'whole_target_hours_omni.npy')
+                if avarage_hours:
+                    targets = np.load(PATH_TO_SAVE_TARGETS + 'whole_target_hours_omni_HOURS.npy')
+                else:
+                    targets = np.load(PATH_TO_SAVE_TARGETS + 'whole_target_hours_omni.npy')
             else:
                 targets = np.load(PATH_TO_SAVE_TARGETS + 'target_array.npy')
             print_i(f'TAKE TARGET FROM {PATH_TO_SAVE_TARGETS}')
@@ -328,7 +348,7 @@ if __name__ == '__main__':
             # TODO: удалить первую колонку если она не proj_id
             # PD_DATA = PD_DATA.drop()
             #
-            PD_DATA.to_excel(PATH_TO_PROJECTS + 'DATA.xlsx')
+            PD_DATA.to_excel(PATH_TO_PROJECTS + 'DATA_HOURS.xlsx')
             if ADD_STATISTIC:
                 if previous:
                     print_i('ADD 3 MONTH STATISTIC with previous')
@@ -359,7 +379,10 @@ if __name__ == '__main__':
             if ADD_STATISTIC:
                 Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'Stat_PD_DATA.xlsx')  # noqa
             else:
-                Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA_.xlsx')  # noqa
+                if avarage_hours:
+                    Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA_HOURS.xlsx')  # noqa
+                else:
+                    Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA_.xlsx')  # noqa
 
             uniq_contr = Stat_PD_DATA['contr_id'].unique()
             for i, contr in enumerate(uniq_contr):
@@ -394,8 +417,11 @@ if __name__ == '__main__':
             train_loader, test_loader = create_dataloaders_train_test(Stat_PD_DATA, model_type)
 
             model_param = Parameters(config, model_type, criteria_type)
-            model_param.net.load_state_dict(torch.load(
-                'data/WEIGHTS/log_model_huber_05_epoch_500_loss_69_mae_547.pt'))
+
+            # model_param.net.load_state_dict(torch.load(
+            #     'data/WEIGHTS/model.pt'))
+
+            # 'data/WEIGHTS/log_model_huber_05_loss13740.948.pt'))
 
             # train_model(model_param.net, train_loader, test_loader, model_param.criteria, 0, model_param.optimizer, 0,
             #             model_param.epochs, SAVE_WEIGHT, 'name')
@@ -438,7 +464,10 @@ if __name__ == '__main__':
             if ADD_STATISTIC:
                 Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'Stat_PD_DATA.xlsx')  # noqa
             else:
-                Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA_.xlsx')  # noqa
+                if avarage_hours:
+                    Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA_HOURS.xlsx')  # noqa
+                else:
+                    Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA_.xlsx')  # noqa
 
             contr_id_real = list(Stat_PD_DATA['contr_id'].unique())
             uniq_contr = Stat_PD_DATA['contr_id'].unique()
@@ -475,7 +504,6 @@ if __name__ == '__main__':
             train_loader, test_loader = create_dataloaders_train_test(Stat_PD_DATA, model_type)
 
             # model_param = Parameters(config, model_type, criteria_type)
-            
 
             feature_contractor_dict = np.load(DOP_DATA_PATH + 'all_contractors.npy', allow_pickle=True).item()
             stages_dict = np.load(DOP_DATA_PATH + 'stages.npy', allow_pickle=True).item()
@@ -486,12 +514,16 @@ if __name__ == '__main__':
             model_param = Parameters(config, model_type, criteria_type)
             # model_param.net.load_state_dict(torch.load(
             #     'data/WEIGHTS/log_model_huber_05_loss13740.948.pt'))
-            model_param.net.load_state_dict(torch.load(f"{SAVE_WEIGHT}log_model_huber_05_loss13740.948.pt"))
+            if avarage_hours:
+                model_param.net.load_state_dict(torch.load(f"{SAVE_WEIGHT}log_model_huber_05_loss0.588.pt"))
+            else:
+                model_param.net.load_state_dict(torch.load(f"{SAVE_WEIGHT}log_model_huber_05_loss12711.709.pt"))
+
 
             tech = [2, 5, 8, 14, 19, 29, 30, 32, 42, 44, 46, 48, 57, 65, 70, 74, 76, 77, 83, 101, 111, 112, 115, 125,
                     143, 157, 172, 209, 216, 234, 235]
             common_statist = []
-            project_id = 23
+            project_id = 18
             for ind, c in enumerate(contr_id_real):
                 for i in tech:
                     print(i)
@@ -503,4 +535,9 @@ if __name__ == '__main__':
                     plt.show()
                     if dict_statist != 0:
                         common_statist.append(dict_statist)
+    # endregion
+
+    # region Status tech
+    if STATUS_TECH:
+        status_tech(PATH_TO_STATUS, PATH_TO_ID_INTROBJ, PATH_TO_SAVE_STATUS)
     # endregion

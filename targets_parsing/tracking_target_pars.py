@@ -3,7 +3,8 @@ import pandas as pd
 from Log.print_lib import *
 
 
-def tracking_target_pars(data_: pd.DataFrame, path_to_dop_materials: str, path_to_save: str) -> None:
+def tracking_target_pars(data_: pd.DataFrame, path_to_dop_materials: str, path_to_save: str, avarage_hours: int = 0) \
+        -> None:
     # path = 'D:/work2/S-krivaia/parsing_exel_Korobov/data/targets_excel/omnicom/omnicom_data.xlsx'
     # data_ = pd.read_excel(path_to_omnic_data)
     # path2 = 'D:/work2/S-krivaia/parsing_exel_Korobov/data/Needed_materials/number_mech_2022.xlsx'
@@ -24,7 +25,7 @@ def tracking_target_pars(data_: pd.DataFrame, path_to_dop_materials: str, path_t
     #         # todo: A value is trying to be set on a copy of a slice from a DataFrame.
     #         #       Try using .loc[row_indexer,col_indexer] = value instead
     #         #       See the caveats in the documentation: https: // pandas.pydata.org / pandas - docs / stable / user_guide / indexing.html  # returning-a-view-versus-a-copy
-    #         data_un_num['year'] = year
+    #         data_un_num.loc[:, data_un_num['year']] = year
     #         data_un_num['month'] = month
     #         data_un_num['day'] = day
     #         # whole_target = whole_target.append(data_un_num)
@@ -68,11 +69,19 @@ def tracking_target_pars(data_: pd.DataFrame, path_to_dop_materials: str, path_t
                     s = whole_target_contr_un_d['stage'].unique()
                     for stage in s:
                         whole_target_contr_un_s = whole_target_contr_un_d.loc[whole_target_contr_un_d['stage'] == stage]
-                        hours_omni = whole_target_contr_un_s['omni'].sum()
+                        if avarage_hours:
+                            hours_omni = 0
+                            for ind, row in whole_target_contr_un_s.iterrows():
+                                avg_hours = 24 if (whole_target_contr_un_s['omni'][ind] // 3600) > 10 else 10 if \
+                                    (whole_target_contr_un_s['omni'][ind] // 3600) > 5 else 0
+                                hours_omni += avg_hours
+                        else:
+                            hours_omni = whole_target_contr_un_s['omni'].sum()
+
                         contr = whole_target_contr_un_s['contractor'].unique()[0]
                         whole_target_hours.loc[0] = [stage, contr, day, month, year, un_res, hours_omni]
                         whole_target_hours.index = whole_target_hours.index + 1
 
-    whole_target_hours.to_excel(path_to_save+"whole_target_hours_omni.xlsx")
-    print_i(f"SAVED FINAL FILE whole_target_hours_omni.xlsx IN {path_to_save}")
+    whole_target_hours.to_excel(path_to_save+"whole_target_hours_omni_10-24.xlsx")
+    print_i(f"SAVED FINAL FILE whole_target_hours_omni_10-24.xlsx IN {path_to_save}")
     # print(1)
