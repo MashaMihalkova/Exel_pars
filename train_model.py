@@ -1,5 +1,6 @@
 from MODEL import *
 from sklearn.metrics import mean_absolute_error
+from wand_config.config import *
 
 target = []
 predictions = []
@@ -145,9 +146,9 @@ def train(model, train_dataloader, val_dataloader, loss, loss_ls, optimizer, sch
         mae = mean_absolute_error(targets, predict)
         if epoch % 10 == 0:
             print("Epoch {}\n Current loss={}, MAE = {}".format(epoch, loss_i, mae))
-            torch.save(model.state_dict(), f"{path_weigh_save}log_model_huber_05_loss{loss_i :.3f}.pt")
+            torch.save(model.state_dict(), f"{path_weigh_save}/avr_hour/add_project_to_model/log_model_huber_05_loss{loss_i :.3f}.pt")
 
-        # wandb.log({f"loss": loss_i, "epoch": epoch, "mae": mae})
+        wandb.log({f"loss": loss_i, "epoch": epoch, "mae": mae})
         if loss_i < min_loss:
             min_loss = loss_i
             torch.save(model.state_dict(), f"{path_weigh_save}log_model_huber_05_loss{loss_i :.3f}.pt")

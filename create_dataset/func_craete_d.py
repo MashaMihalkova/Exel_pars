@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from Log.print_lib import *
 
 PO_BEGIN = 2  # индекс начала РО
 LEN_PO = 373  # количество РО
@@ -25,6 +26,13 @@ TRACKING_VALUE_T = 6  # индекс начала hours в target
 
 
 def create_dataset(projects, pd_tar, tracking: int) -> dict:
+    """
+    :param projects: путь до данных с признаками (из примаверы)
+    :param pd_tar: DataFrame файл со всеми таргетами
+    :param tracking: флаг если трекинг
+    :return: собранный словарь датасета
+    """
+    # region инициализации словаря
     dict_data = {'proj_id': [], 'contr_id': []}
     for i in range(LEN_PO):
         dict_data[f'{i}'] = []
@@ -35,19 +43,20 @@ def create_dataset(projects, pd_tar, tracking: int) -> dict:
     dict_data['res_id'] = []
     dict_data['target'] = []
     dict_pd = {'target': [], 'row': [], 'proj_id': []}
+    # endregion
+
+    # TODO: остановилась тут ( надо сделтаь разбивку по дням ( проверку чтобы в месяце было больше чем 1 день)
     # d = np.load('data_/whole_2021.xlsx')
+    # проходим по всем файлам с проектами (по всем КС)
     for p in projects:
-        # if isinstance(p, np.ndarray):
-        #     proj = np.load(p)
-        # else:
-        #     proj = pd.read_excel(p)
         try:
            proj = np.load(p, allow_pickle=True)
         except Exception as e:  # noqa
             proj = pd.read_excel(p)  # noqa
         pd_proj = pd.DataFrame(proj)  # 0/1 - proj/contr, 2-377 - PO
-        print(f'proj_name = {p} , proj_id =  {pd_proj[1][0]}')
-        # По уникальным контракторам , потом по уникальным месяцам и по годам , потом по ресурсам из ПРОЕКТА
+        print_i(f'proj_name = {p} , proj_id =  {pd_proj[1][0]}')
+
+        # По уникальным контракторам , потом по уникальным месяцам и по годам , потом по ресурсам из ТАРГЕТА
         contr_unoque = pd_proj[:][CONTR_ID].unique()
         if tracking:
             month_unique = pd_proj[:][TRACKING_MONTH_P].unique()
@@ -111,16 +120,20 @@ def create_dataset(projects, pd_tar, tracking: int) -> dict:
                                             res_id = day_id.loc[day_id[TRACKING_RESOURCE_T] == res]
                                             if res_id.shape[0] != 0:
                                                 target = res_id[TRACKING_VALUE_T].values.sum()
-                                                contract_p = pd_proj.loc[pd_proj[CONTR_ID] == contr]
-                                                month_p = contract_p.loc[contract_p[TRACKING_MONTH_P] == month_n]
-                                                day_p = month_p.loc[month_p[TRACKING_DAY_P] == day]
-                                                year_p = day_p.loc[day_p[TRACKING_YEAR_P] == year]
-                                                res_p = year_p.loc[year_p[TRACKING_RESOURCE_P] == res]
-                                                if res_p.shape[0] != 0:
-                                                    # print(1)
-                                                    dict_pd['proj_id'].append(pd_proj[0][0])
-                                                    dict_pd['target'].append(target)
-                                                    dict_pd['row'].append(res_p.index[0])
+                                                if target != 0:
+                                                    contract_p = pd_proj.loc[pd_proj[CONTR_ID] == contr]
+                                                    month_p = contract_p.loc[contract_p[TRACKING_MONTH_P] == month_n]
+                                                    year_p = month_p.loc[month_p[TRACKING_YEAR_P] == year]
+                                                    res_p = year_p.loc[year_p[TRACKING_RESOURCE_P] == res]
+                                                    if res_p.shape[0] > 1:
+                                                        day_p = res_p.loc[res_p[TRACKING_DAY_P] == day]
+                                                        # year_p = day_p.loc[day_p[TRACKING_YEAR_P] == year]
+                                                        # res_p = year_p.loc[year_p[TRACKING_RESOURCE_P] == res]
+                                                        if day_p.shape[0] != 0:
+                                                            # print(1)
+                                                            dict_pd['proj_id'].append(pd_proj[0][0])
+                                                            dict_pd['target'].append(target)
+                                                            dict_pd['row'].append(day_p.index[0])
                                 else:
                                     for res in res_unique:
                                         res_id = month_id.loc[month_id[RESOURCE_T] == res]

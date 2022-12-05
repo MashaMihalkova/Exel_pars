@@ -114,7 +114,7 @@ if __name__ == '__main__':
 
     parser.add_option('-m', '--TARGET_CONNECT', type=int, help="NEED TO DOWNLOAD TARGETS TRACKING FROM DB", default=0)
 
-    parser.add_option('-a', '--CREATE_DATASET', type=int, help="CREATE_DATASET", default=0)
+    parser.add_option('-a', '--CREATE_DATASET', type=int, help="CREATE_DATASET", default=1)
 
     parser.add_option('-z', '--ADD_STATISTIC', type=int, help="ADD_STATISTIC to dataset 3 month", default=0)
 
@@ -140,8 +140,10 @@ if __name__ == '__main__':
     CREATE_DATASET = getattr(options, 'CREATE_DATASET')
     ADD_STATISTIC = getattr(options, 'ADD_STATISTIC')
 
-    TRAIN: int = 1
+    TRAIN: int = 0
     TEST: int = 0
+
+    WandB = 0
 
     avarage_hours = 1  # усреднить показания с двигателя omni по часам ( т е либо 10 либо 24 часа отрабатывала техника),
                        # чтобы избавиться от шума
@@ -308,8 +310,8 @@ if __name__ == '__main__':
                 df = pd.read_excel(PATH_TO_SAVE_TARGETS + 'omni_data.xlsx')
                 # df = pd.read_excel(PATH_TO_SAVE_TARGETS + 'omnicom_data.xlsx')
 
-            # tracking_target_pars(df, path_to_dop_materials='data/Needed_materials/', path_to_save=PATH_TO_SAVE_TARGETS,
-            #                      avarage_hours=avarage_hours)
+            tracking_target_pars(df, path_to_dop_materials='data/Needed_materials/', path_to_save=PATH_TO_SAVE_TARGETS,
+                                 avarage_hours=avarage_hours)
             if avarage_hours:
                 convert_target_to_npy(f'{PATH_TO_SAVE_TARGETS}whole_target_hours_omni_10-24.xlsx', DOP_DATA_PATH,
                                       PATH_TO_SAVE_TARGETS, tracking=1, avarage_hours=avarage_hours)
@@ -348,7 +350,7 @@ if __name__ == '__main__':
             # TODO: удалить первую колонку если она не proj_id
             # PD_DATA = PD_DATA.drop()
             #
-            PD_DATA.to_excel(PATH_TO_PROJECTS + 'DATA_HOURS.xlsx')
+            PD_DATA.to_excel(PATH_TO_PROJECTS + 'DATA_HOURS_correct.xlsx')
             if ADD_STATISTIC:
                 if previous:
                     print_i('ADD 3 MONTH STATISTIC with previous')
@@ -418,8 +420,8 @@ if __name__ == '__main__':
 
             model_param = Parameters(config, model_type, criteria_type)
 
-            # model_param.net.load_state_dict(torch.load(
-            #     'data/WEIGHTS/model.pt'))
+            model_param.net.load_state_dict(torch.load(
+                'data/WEIGHTS/avr_hour/add_project_to_model/log_model_huber_05_loss0.108.pt'))
 
             # 'data/WEIGHTS/log_model_huber_05_loss13740.948.pt'))
 
@@ -515,15 +517,16 @@ if __name__ == '__main__':
             # model_param.net.load_state_dict(torch.load(
             #     'data/WEIGHTS/log_model_huber_05_loss13740.948.pt'))
             if avarage_hours:
-                model_param.net.load_state_dict(torch.load(f"{SAVE_WEIGHT}log_model_huber_05_loss0.588.pt"))
+                # model_param.net.load_state_dict(torch.load(f"{SAVE_WEIGHT}log_model_huber_05_loss0.588.pt"))
+                model_param.net.load_state_dict(
+                    torch.load(f"{SAVE_WEIGHT}/avr_hour/add_project_to_model/log_model_huber_05_loss0.108.pt"))
             else:
                 model_param.net.load_state_dict(torch.load(f"{SAVE_WEIGHT}log_model_huber_05_loss12711.709.pt"))
-
 
             tech = [2, 5, 8, 14, 19, 29, 30, 32, 42, 44, 46, 48, 57, 65, 70, 74, 76, 77, 83, 101, 111, 112, 115, 125,
                     143, 157, 172, 209, 216, 234, 235]
             common_statist = []
-            project_id = 18
+            project_id = 23
             for ind, c in enumerate(contr_id_real):
                 for i in tech:
                     print(i)

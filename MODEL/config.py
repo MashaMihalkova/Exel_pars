@@ -26,6 +26,7 @@ class Parameters:
                                          self._hidden_size,
                                          self._num_layers,
                                          self.device)
+            # self.net = predict_hours_net(self.device)
         elif self.model_type is ModelType.Linear_3MONTH:
             self.net = predict_hours_net_3MONTH(self._input_size,
                                                 self._hidden_size,

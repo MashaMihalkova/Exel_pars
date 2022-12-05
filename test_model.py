@@ -1,3 +1,4 @@
+import pandas as pd
 import torch
 from matplotlib import pyplot as plt
 from MODEL.config import ModelType
@@ -43,10 +44,11 @@ from MODEL.config import ModelType
 
 
 # предикт по всем данным
-def show_results(y_true, y_pred, sum_plans, name=None):
+def show_results(y_true, y_pred, sum_plans, avr_pred,  name=None):
     plt.plot(y_true, label='Целевое значение')
     plt.plot(y_pred, label='Прогноз ИИ модели', color='orange')
-    # plt.plot(sum_plans, label='Плановое значение Primavera', color='g')
+    plt.plot(sum_plans, label='Плановое значение Primavera', color='red')
+    plt.plot(avr_pred, label='усредненное значение', color='g')
 
     plt.grid()
     plt.legend(loc='best')
@@ -84,6 +86,8 @@ def get_predict(PD_DATA, feature_contractor_dict_ids, stages_dict_ids, mech_res_
     sum_plans = plans.sum(axis=1)
 
     sum_plans = sum_plans.values
+    # sum_plans = sum_plans//3600
+
     # sum_plans[0] = sum_plans[0]//10
 
     predict = []
@@ -114,8 +118,12 @@ def get_predict(PD_DATA, feature_contractor_dict_ids, stages_dict_ids, mech_res_
             Contractor = list(feature_contractor_dict_ids.keys())[list(feature_contractor_dict_ids.values()).index(contr_id_real)]
             project = list(stages_dict_ids.keys())[list(stages_dict_ids.values()).index(project_id)]
             resource = list(mech_res_ids.keys())[list(mech_res_ids.values()).index(resource_id)]
+            pred_serias = pd.Series(predict)
+            rolling = pred_serias.rolling(window=5)
+            rolling_mean = rolling.mean()
+            # print(rolling_mean.head(10))
 
-            show_results(target, predict, sum_plans,
+            show_results(target, predict,  sum_plans, rolling_mean,
                          name=f'Contractor = {Contractor},'
                               f' project = {project} \n resource = {resource}')
         return 0
