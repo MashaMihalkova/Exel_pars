@@ -1,5 +1,6 @@
 import torch.cuda
 
+from create_dataset.averaging_over_days import averaging_over_days
 from targets_parsing.pars_targets import *
 from targets_parsing.convert_to_target_npy import *
 from targets_parsing.tracking_target_pars import *
@@ -10,7 +11,7 @@ from sql_connection.extract_data_from_bd import sql_quary
 from create_dataset.create_dataset_ import *
 from glob import glob
 from train_model import train_model, train
-# from wand_config.config import *
+from wand_config.config import *
 # from datetime import datetime
 from create_dop_materials.status_tech import *
 from create_dop_materials.create_stages import *
@@ -114,7 +115,7 @@ if __name__ == '__main__':
 
     parser.add_option('-m', '--TARGET_CONNECT', type=int, help="NEED TO DOWNLOAD TARGETS TRACKING FROM DB", default=0)
 
-    parser.add_option('-a', '--CREATE_DATASET', type=int, help="CREATE_DATASET", default=1)
+    parser.add_option('-a', '--CREATE_DATASET', type=int, help="CREATE_DATASET", default=0)
 
     parser.add_option('-z', '--ADD_STATISTIC', type=int, help="ADD_STATISTIC to dataset 3 month", default=0)
 
@@ -143,10 +144,15 @@ if __name__ == '__main__':
     TRAIN: int = 0
     TEST: int = 0
 
-    WandB = 0
+    WandB_flag = 0  # запуск wandb
 
     avarage_hours = 1  # усреднить показания с двигателя omni по часам ( т е либо 10 либо 24 часа отрабатывала техника),
                        # чтобы избавиться от шума
+
+    averaging_over_N_days = 1  # усреднение показаний с двигателя omni по часам по N дней
+                               # (т.е. предсказывать среднее значение на N дней)
+    N_days_avr = 5
+
     # дополнительный файл со статусами из КА
     STATUS_TECH = 0  # переименование ид IDINTROBJ в объект.
     PATH_TO_STATUS = 'data/status_tech/tech_status.xlsx'
@@ -367,25 +373,44 @@ if __name__ == '__main__':
                 print_e(f"ERROR WHEN TRY TO CREATE DATASET, BECAUSE THERE ARE NO FILES IN PATH_NPY_PROJECTS")
                 error_flag = 1
     else:
-        if os.path.exists(f'{PATH_TO_PROJECTS}DATA.xlsx'):
-            print_i(f'TAKE DATASET FROM {PATH_TO_PROJECTS}DATA.xlsx')
+        if avarage_hours:
+            if os.path.exists(f'{PATH_TO_PROJECTS}DATA_HOURS_correct.xlsx'):
+                print_i(f'TAKE DATASET FROM {PATH_TO_PROJECTS}DATA_HOURS_correct.xlsx')
+            else:
+                print_e(f"THERE ARE NO ANY FILES IN {PATH_TO_PROJECTS}DATA_HOURS_correct.xlsx ")
+                error_flag = 1
         else:
-            print_e(f"THERE ARE NO ANY FILES IN {PATH_TO_PROJECTS}DATA.xlsx ")
-            error_flag = 1
+            if os.path.exists(f'{PATH_TO_PROJECTS}DATA.xlsx'):
+                print_i(f'TAKE DATASET FROM {PATH_TO_PROJECTS}DATA.xlsx')
+            else:
+                print_e(f"THERE ARE NO ANY FILES IN {PATH_TO_PROJECTS}DATA.xlsx ")
+                error_flag = 1
+    # endregion
+
+    # region averaging_over_N_days
+    if averaging_over_N_days:
+        print_i(f'TRY to average dataset DATA_HOURS_correct.xlsx over {N_days_avr} days')
+        averaging_over_days(pd.read_excel(PATH_TO_PROJECTS + 'DATA_HOURS_correct.xlsx'), N_days_avr, PATH_TO_PROJECTS)
+
     # endregion
 
     # region TRAIN model
     if TRAIN:
+        # load data
         print(torch.cuda.is_available())
         if not error_flag:
             if ADD_STATISTIC:
                 Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'Stat_PD_DATA.xlsx')  # noqa
             else:
                 if avarage_hours:
-                    Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA_HOURS.xlsx')  # noqa
+                    # Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA_HOURS.xlsx')  # noqa
+                    Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA_HOURS_correct.xlsx')  # noqa
                 else:
                     Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA_.xlsx')  # noqa
-
+            if 'Unnamed: 0' in Stat_PD_DATA.columns:
+                Stat_PD_DATA = Stat_PD_DATA.drop('Unnamed: 0', axis=1)
+            # TODO: сделать нормальное преобразование OneHotEncoder get_dummies
+            # convert contractor, month and year
             uniq_contr = Stat_PD_DATA['contr_id'].unique()
             for i, contr in enumerate(uniq_contr):
                 Stat_ = Stat_PD_DATA.loc[Stat_PD_DATA['contr_id'] == contr]
@@ -416,17 +441,17 @@ if __name__ == '__main__':
                 Stat_PD_DATA_y = Stat_PD_DATA_y.append(Stat_y)
             Stat_PD_DATA = Stat_PD_DATA_y
 
+            # create dataset
             train_loader, test_loader = create_dataloaders_train_test(Stat_PD_DATA, model_type)
-
+            # create model
             model_param = Parameters(config, model_type, criteria_type)
-
+            # load pretrain model
             model_param.net.load_state_dict(torch.load(
-                'data/WEIGHTS/avr_hour/add_project_to_model/log_model_huber_05_loss0.108.pt'))
-
-            # 'data/WEIGHTS/log_model_huber_05_loss13740.948.pt'))
-
-            # train_model(model_param.net, train_loader, test_loader, model_param.criteria, 0, model_param.optimizer, 0,
-            #             model_param.epochs, SAVE_WEIGHT, 'name')
+                'data/WEIGHTS/avr_hour/add_project_to_model/best_pretrained_weights.pt'))
+            # run wandb
+            if WandB_flag:
+                WandB(config, model_type, criteria_type)
+            # train model
             model = train(model_param.net, train_loader, test_loader, model_param.criteria, 0, model_param.optimizer, 0,
                           model_param.epochs, SAVE_WEIGHT, device, 'name')
             torch.save(model.state_dict(), f"{SAVE_WEIGHT}model.pt")
@@ -435,42 +460,17 @@ if __name__ == '__main__':
 
     # region TEST MODEL
     if TEST:
-        # предикт по всем данным
-        # if not error_flag:
-        #     if ADD_STATISTIC:
-        #         Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'Stat_PD_DATA.xlsx')  # noqa
-        #     else:
-        #         Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA.xlsx')  # noqa
-        #
-        #     contr_id_real = list(Stat_PD_DATA['contr_id'].unique())
-        #     uniq_contr = Stat_PD_DATA['contr_id'].unique()
-        #     for i, contr in enumerate(uniq_contr):
-        #         Stat_ = Stat_PD_DATA.loc[Stat_PD_DATA['contr_id'] == contr]
-        #         if not Stat_.empty:
-        #             Stat_['contr_id'] = i
-        #     Stat_PD_DATA = Stat_
-        #     contractor_id = list(Stat_PD_DATA['contr_id'].unique())
-        #     uniq_month = Stat_PD_DATA['month'].unique()
-        #     Stat_PD_DATA_m = pd.DataFrame()
-        #     for i, month in enumerate(uniq_month):
-        #         Stat_m = Stat_PD_DATA.loc[Stat_PD_DATA['month'] == month]
-        #         if month > 12:
-        #             Stat_m['month'] = month - 12
-        #             # Stat_PD_DATA.loc[Stat_PD_DATA['month'] == month] = month - 12
-        #         Stat_PD_DATA_m = Stat_PD_DATA_m.append(Stat_m)
-        #     Stat_PD_DATA = Stat_PD_DATA_m
-        #
-        #     train_loader, test_loader = create_dataloaders_train_test(Stat_PD_DATA, model_type)
+        # load data
         print(torch.cuda.is_available())
         if not error_flag:
             if ADD_STATISTIC:
                 Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'Stat_PD_DATA.xlsx')  # noqa
             else:
                 if avarage_hours:
-                    Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA_HOURS.xlsx')  # noqa
+                    Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA_HOURS_correct.xlsx')  # noqa
                 else:
                     Stat_PD_DATA = pd.read_excel(PATH_TO_PROJECTS + 'DATA_.xlsx')  # noqa
-
+            # convert
             contr_id_real = list(Stat_PD_DATA['contr_id'].unique())
             uniq_contr = Stat_PD_DATA['contr_id'].unique()
             for i, contr in enumerate(uniq_contr):
@@ -502,31 +502,34 @@ if __name__ == '__main__':
                     # Stat_PD_DATA.loc[Stat_PD_DATA['month'] == month] = month - 12
                 Stat_PD_DATA_y = Stat_PD_DATA_y.append(Stat_y)
             Stat_PD_DATA = Stat_PD_DATA_y
-
+            # create dataset
             train_loader, test_loader = create_dataloaders_train_test(Stat_PD_DATA, model_type)
-
-            # model_param = Parameters(config, model_type, criteria_type)
-
+            # load dop materials
             feature_contractor_dict = np.load(DOP_DATA_PATH + 'all_contractors.npy', allow_pickle=True).item()
             stages_dict = np.load(DOP_DATA_PATH + 'stages.npy', allow_pickle=True).item()
             mech_res_dict = np.load(DOP_DATA_PATH + 'mech_res_dict.npy', allow_pickle=True).item()
             feature_contractor_dict_ids = {v: k for k, v in feature_contractor_dict.items()}
             stages_dict_ids = {v: k for k, v in stages_dict.items()}
             mech_res_ids = {v: k for k, v in mech_res_dict.items()}
+            # create model
             model_param = Parameters(config, model_type, criteria_type)
-            # model_param.net.load_state_dict(torch.load(
-            #     'data/WEIGHTS/log_model_huber_05_loss13740.948.pt'))
+            # load weights
             if avarage_hours:
                 # model_param.net.load_state_dict(torch.load(f"{SAVE_WEIGHT}log_model_huber_05_loss0.588.pt"))
+                # model_param.net.load_state_dict(
+                #     torch.load(f"{SAVE_WEIGHT}/avr_hour/add_project_to_model/log_model_huber_05_loss0.108.pt"))
                 model_param.net.load_state_dict(
-                    torch.load(f"{SAVE_WEIGHT}/avr_hour/add_project_to_model/log_model_huber_05_loss0.108.pt"))
+                    torch.load(f"{SAVE_WEIGHT}avr_hour/add_project_to_model/log_model_huber_05_loss2.544.pt"))
             else:
                 model_param.net.load_state_dict(torch.load(f"{SAVE_WEIGHT}log_model_huber_05_loss12711.709.pt"))
 
+            # needed machines
             tech = [2, 5, 8, 14, 19, 29, 30, 32, 42, 44, 46, 48, 57, 65, 70, 74, 76, 77, 83, 101, 111, 112, 115, 125,
                     143, 157, 172, 209, 216, 234, 235]
             common_statist = []
-            project_id = 23
+            # choose project
+            project_id = 17
+            # run test for project by all contractors and machines
             for ind, c in enumerate(contr_id_real):
                 for i in tech:
                     print(i)

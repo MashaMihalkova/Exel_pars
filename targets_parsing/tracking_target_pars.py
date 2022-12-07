@@ -23,6 +23,9 @@ def tracking_target_pars(data_: pd.DataFrame, path_to_dop_materials: str, path_t
     data_contr = pd.read_excel(path_to_dop_materials + 'number_mech_2022.xlsx')
     whole_target['contractor'] = ''
 
+    # data_['year'] = ''
+    # data_['month'] = ''
+    # data_['day'] = ''
     unique_number = data_contr['plate_number'].unique()
     for un_num in unique_number:
         data_un_num = data_.loc[data_['vehicle_passport_number'] == un_num]
@@ -33,9 +36,14 @@ def tracking_target_pars(data_: pd.DataFrame, path_to_dop_materials: str, path_t
             month = d.dt.month
             day = d.dt.day
 
-            data_un_num.loc[:, data_un_num['year']] = year
-            data_un_num.loc[:, data_un_num['month']] = month
-            data_un_num.loc[:, data_un_num['day']] = day
+            # data_un_num.loc[:, data_un_num['year']] = year
+            # data_un_num.loc[:, data_un_num['month']] = month
+            # data_un_num.loc[:, data_un_num['day']] = day
+            data_un_num['year'] = year
+            data_un_num['month'] = month
+            data_un_num['day'] = day
+
+
             # whole_target = whole_target.append(data_un_num)
             for y in year.unique():
                 data_un_num_y = data_un_num.loc[data_un_num['year'] == y]
@@ -53,7 +61,7 @@ def tracking_target_pars(data_: pd.DataFrame, path_to_dop_materials: str, path_t
     whole_target['omni'] = whole_target['without_movement'] + whole_target['in_movement']
     whole_target = whole_target.rename(columns={'name_proj': 'stage', 'name_resource': 'res_name'})
     # если контрактор получился пусто, тогда заполнить его 'ООО "СГК-1"'
-    whole_target.loc[whole_target['contractor'] == ''] = 'ООО "СГК-1"'
+    whole_target.loc[whole_target['contractor'] == '', 'contractor'] = 'ООО "СГК-1"'
 
     whole_target.to_excel(path_to_save + 'omnicom+contractors.xlsx')
     print_i(f"SAVED INTERMEDIATE FILE omnicom+contractors.xlsx IN {path_to_save}")

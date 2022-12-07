@@ -52,7 +52,7 @@ def show_results(y_true, y_pred, sum_plans, avr_pred,  name=None):
 
     plt.grid()
     plt.legend(loc='best')
-    plt.xlabel('месяцы')
+    plt.xlabel('дни')
     plt.ylabel('машиночасы')
     if not name: name = 'Cравнение применения ИИ моделей для прогнозирования техники'
     plt.title(name);
