@@ -7,6 +7,12 @@ __pycache__/
 # data files
 data/
 
+#presentations
+reports/presentations/
+
+#model weights
+weights/
+
 # backup files
 *.bak
 
