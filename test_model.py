@@ -2,65 +2,35 @@ import pandas as pd
 import torch
 from matplotlib import pyplot as plt
 from MODEL.config import ModelType
-#
-# def show_results(y_true, y_pred, name=None):
-#     plt.plot(y_true, label='Целевое значение')
-#     plt.plot(y_pred, label='Прогноз ИИ модели')
-#
-#     plt.grid()
-#     plt.legend(loc='best')
-#     plt.xlabel('месяцы')
-#     plt.ylabel('машиночасы')
-#     if not name: name = 'Cравнение применения ИИ моделей для прогнозирования техники'
-#     plt.title(name);
-#
-#
-# def get_predict(PD_DATA, feature_contractor_dict_ids, stages_dict_ids, mech_res_ids,  model, contractor_id, project_id,
-#                 resource_id, print_result=False, plot_result=True):
-#     a = list(map(str, range(0, 373)))
-#     b = ['proj_id', 'contr_id']
-#     b.extend(a)
-#     b.extend(['month', 'year', 'res_id', 'target'])
-#     df_for_predict = PD_DATA.loc[(PD_DATA.contr_id == contractor_id) & (PD_DATA.proj_id == project_id) & (
-#             PD_DATA.res_id == resource_id), b]
-#     features_for_predict = torch.tensor(df_for_predict.iloc[:, :-1].values).to(torch.float)
-#     target = df_for_predict.iloc[:, -1].values
-#
-#     predict = []
-#
-#     with torch.no_grad():
-#         for month in range(features_for_predict.shape[0]):
-#             a = model(features_for_predict[month])
-#             predict.append(a.tolist())
-#
-#     if print_result:
-#         for i in range(len(predict)):
-#             print(f'month = {i + 1}, predict = {predict[i] :.2f}, target = {target[i] :.2f}')
-#
-#     if plot_result:
-#         show_results(target, predict,
-#                      name=f'Contractor = {feature_contractor_dict_ids[contractor_id]},'
-#                           f' project = {stages_dict_ids[project_id]} ,\n resource_id = {mech_res_ids[resource_id]} ')
 
 
 # предикт по всем данным
-def show_results(y_true, y_pred, sum_plans, avr_pred,  name=None):
-    plt.plot(y_true, label='Целевое значение')
-    plt.plot(y_pred, label='Прогноз ИИ модели', color='orange')
-    plt.plot(sum_plans, label='Плановое значение Primavera', color='red')
-    plt.plot(avr_pred, label='усредненное значение', color='g')
+def show_results(y_true, y_pred, sum_plans, avr_pred, date_pd, name=None, future=0):
+    if not future:
+        plt.plot(date_pd, y_true, label='Целевое значение')
+    plt.plot(date_pd, y_pred, label='Прогноз ИИ модели', color='orange')
+    plt.plot(date_pd, sum_plans, label='Плановое значение Primavera', color='red')
 
+    # plt.plot(avr_pred, label='усредненное значение', color='g')
+    plt.xticks(rotation=45)
     plt.grid()
     plt.legend(loc='best')
-    plt.xlabel('дни')
+    # plt.xlabel('месяц')
     plt.ylabel('машиночасы')
     if not name: name = 'Cравнение применения ИИ моделей для прогнозирования техники'
     plt.title(name);
 
 
 def get_predict(PD_DATA, feature_contractor_dict_ids, stages_dict_ids, mech_res_ids, model, model_type, contractor_id,
-                contr_id_real, project_id, resource_id, print_result=False, plot_result=True, tracking: int = 0):
-    a = list(map(str, range(0, 373)))
+                contr_id_real, project_id, resource_id, print_result=False, plot_result=True, tracking: int = 0,
+                future: int = 0):
+    # обычный а
+    if future:
+        a = list(map(int, range(2, 375)))
+    else:
+        a = list(map(str, range(0, 373)))
+    # Для кс3 с 2023 года
+
     b = ['proj_id', 'contr_id']
     b.extend(a)
     if tracking:
@@ -70,8 +40,26 @@ def get_predict(PD_DATA, feature_contractor_dict_ids, stages_dict_ids, mech_res_
             b.extend(['month', 'year', 'res_id', 'm_1', 'm_2', 'm_3', 'target'])
         else:
             b.extend(['month', 'year', 'res_id', 'target'])
+
+    # выгрузка с учетом контрактора
+    # df_for_predict = PD_DATA.loc[
+    #     (PD_DATA.contr_id == contractor_id) & (PD_DATA.proj_id == project_id) & (PD_DATA.res_id == resource_id), b]
+
     df_for_predict = PD_DATA.loc[
-        (PD_DATA.contr_id == contractor_id) & (PD_DATA.proj_id == project_id) & (PD_DATA.res_id == resource_id), b]
+        (PD_DATA.proj_id == project_id) & (PD_DATA.res_id == resource_id), b]
+
+    # дата по для отрисовки по оси x
+    df_for_predict = df_for_predict.sort_values(['year', 'month'])
+    date_pd = df_for_predict.copy()
+    if df_for_predict.proj_id.unique() == 17:
+        if future:
+            date_pd['year'] = date_pd['year'].map({0: 2022, 1: 2023})
+    else:  # if df_for_predict.proj_id.unique() == 23:
+        date_pd['year'] = date_pd['year'].map({0: 2021, 1: 2022})
+    date_pd['month'] = date_pd['month'] + 1
+    date_pd['date'] = pd.to_datetime(date_pd[['year', 'month']].assign(DAY=1))
+    # датафрейм для сохранения в xlsx
+    predict_pd_xlsx = pd.DataFrame(columns=('date', 'project', 'predict', 'resource', 'resource_id'))
 
     features_for_predict = torch.tensor(df_for_predict.iloc[:, :-1].values).to(torch.float)
     target = df_for_predict.iloc[:, -1].values
@@ -87,9 +75,6 @@ def get_predict(PD_DATA, feature_contractor_dict_ids, stages_dict_ids, mech_res_
 
     sum_plans = sum_plans.values
     # sum_plans = sum_plans//3600
-
-    # sum_plans[0] = sum_plans[0]//10
-
     predict = []
 
     with torch.no_grad():
@@ -115,15 +100,23 @@ def get_predict(PD_DATA, feature_contractor_dict_ids, stages_dict_ids, mech_res_
     if plot_result:
         if target.shape[0] != 0:
             print(f'Resource_id = {resource_id}')
-            Contractor = list(feature_contractor_dict_ids.keys())[list(feature_contractor_dict_ids.values()).index(contr_id_real)]
+            Contractor = list(feature_contractor_dict_ids.keys())[
+                list(feature_contractor_dict_ids.values()).index(contr_id_real)]
             project = list(stages_dict_ids.keys())[list(stages_dict_ids.values()).index(project_id)]
             resource = list(mech_res_ids.keys())[list(mech_res_ids.values()).index(resource_id)]
             pred_serias = pd.Series(predict)
             rolling = pred_serias.rolling(window=5)
             rolling_mean = rolling.mean()
             # print(rolling_mean.head(10))
+            # date_pd['date']
 
-            show_results(target, predict,  sum_plans, rolling_mean,
+            predict_pd_xlsx['date'] = date_pd['date']
+            predict_pd_xlsx['project'] = project
+            predict_pd_xlsx['predict'] = predict
+            predict_pd_xlsx['resource'] = resource
+            predict_pd_xlsx['resource_id'] = resource_id
+
+            show_results(target, predict, sum_plans, rolling_mean, date_pd['date'],
                          name=f'Contractor = {Contractor},'
-                              f' project = {project} \n resource = {resource}')
-        return 0
+                              f' project = {project} \n resource = {resource}', future=future)
+        return predict_pd_xlsx

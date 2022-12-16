@@ -32,6 +32,9 @@ def create_dataset(projects, pd_tar, tracking: int) -> dict:
     :param tracking: флаг если трекинг
     :return: собранный словарь датасета
     """
+    # забиваем на контрактора и метчим просто так
+    exec_contr = 1
+
     # region инициализации словаря
     dict_data = {'proj_id': [], 'contr_id': []}
     for i in range(LEN_PO):
@@ -54,7 +57,7 @@ def create_dataset(projects, pd_tar, tracking: int) -> dict:
         except Exception as e:  # noqa
             proj = pd.read_excel(p)  # noqa
         pd_proj = pd.DataFrame(proj)  # 0/1 - proj/contr, 2-377 - PO
-        print_i(f'proj_name = {p} , proj_id =  {pd_proj[1][0]}')
+        print_i(f'proj_name = {p} , proj_id =  {pd_proj[0][0]}')
 
         # По уникальным контракторам , потом по уникальным месяцам и по годам , потом по ресурсам из ТАРГЕТА
         contr_unoque = pd_proj[:][CONTR_ID].unique()
@@ -72,7 +75,10 @@ def create_dataset(projects, pd_tar, tracking: int) -> dict:
             proj_id = pd_tar.loc[pd_tar[PROJ_ID] == pd_proj[0][0]]
 
         for contr in contr_unoque:
-            contr_id = proj_id.loc[proj_id[CONTR_ID] == contr]
+            if not exec_contr:
+                contr_id = proj_id.loc[proj_id[CONTR_ID] == contr]
+            else:
+                contr_id = proj_id
             if contr_id.shape[0] != 0:
                 for year in year_unique:
                     if year == 2021.0:

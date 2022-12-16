@@ -124,6 +124,9 @@ def parse_data(df, fact):
 def parse_data_xls(df, fact):
     year = int(df.iloc[0, 2][14:18])
     month = int(df.iloc[0, 2][11:13])
+    if month == 12 and year == 2021:
+        fact = 12
+
     data = []
     dict_OOO = dict()  # подрядчик
     dict_stage = dict()  # проект

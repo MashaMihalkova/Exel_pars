@@ -42,20 +42,21 @@ class predict_hours_net(nn.Module):
 
         #  out_features = количество техник 246
         self.activity_dense = positive_weights_linear(in_features=373, out_features=246)
-        self.proj_dense = torch.nn.Linear(in_features=24, out_features=1, bias=False)
+        self.proj_dense = torch.nn.Linear(in_features=23, out_features=1, bias=False)
         self.contractor_dense = torch.nn.Linear(in_features=4, out_features=1, bias=False)
         self.year_dense = torch.nn.Linear(in_features=2, out_features=1, bias=True)
         self.month_dense = torch.nn.Linear(in_features=12, out_features=1, bias=False)
 
     def forward(self, x):
         # умножили на матрицу весов
-        sum_of_activities = self.activity_dense(x[2:-4], x[-1].long())
+        # sum_of_activities = self.activity_dense(x[2:-4], x[-1].long())  # если трекинг!!!
+        sum_of_activities = self.activity_dense(x[2:-3], x[-1].long())
 
         # MULTIPLY BY PROJ
-        sum_of_proj = self.proj_dense.weight[0, x[0].long()] * sum_of_activities
+        # sum_of_proj = self.proj_dense.weight[0, x[0].long()] * sum_of_activities
 
         # умножили на коэф месяца
-        sum_of_activities_month = self.month_dense.weight[0, x[-3].long()] * sum_of_proj
+        sum_of_activities_month = self.month_dense.weight[0, x[-3].long()] * sum_of_activities
 
         # умножили на коэф.года
         sum_of_activities_month_year = self.year_dense.weight[0, x[-2].long()] * sum_of_activities_month

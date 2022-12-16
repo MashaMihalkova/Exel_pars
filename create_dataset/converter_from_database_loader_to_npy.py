@@ -3,7 +3,8 @@ import pandas as pd
 from tqdm import tqdm
 
 
-def prepare_features(df: pd.DataFrame, path: str, save_path: str, stages_dict: dict, tracking: int = 0) -> None:
+def prepare_features(df: pd.DataFrame, path: str, save_path: str, stages_dict: dict, tracking: int = 0,
+                     FO: str = 'act_reg_qty') -> None:
     nan_res_df = df.loc[np.isnan(df['res_id'])]
     if not nan_res_df.empty:
         df = df.drop(df.index[nan_res_df.index])
@@ -14,12 +15,14 @@ def prepare_features(df: pd.DataFrame, path: str, save_path: str, stages_dict: d
 
     contr_list = pd.unique(df.contr_id)
     res_list = pd.unique(df.res_id)
+    year_list = pd.unique(df.year)
+    year_list.sort()
     if tracking:
         # month = 24
         day = 24*31
         len_features = 378
     else:
-        day = 24  # month за 2 года 12*2
+        day = 36  # month за 2 года 12*2
         len_features = 377
     # month_ =
     feature_array = np.zeros((len(contr_list), len(res_list), day, len_features), dtype=float)
@@ -28,7 +31,8 @@ def prepare_features(df: pd.DataFrame, path: str, save_path: str, stages_dict: d
         # ищем позицию контрактора
         contr_position = np.where(contr_list == c)[0][0]
 
-        for y in [2021, 2022]:  # year
+        # for y in [2021, 2022]:  # year
+        for y in year_list:  # [2021, 2022, 2023]:  # year
             print('year = ', y)
 
             for m in tqdm(range(1, 13, 1)):  # month
@@ -58,15 +62,14 @@ def prepare_features(df: pd.DataFrame, path: str, save_path: str, stages_dict: d
                                 # day_ = (y - 2021) * 12 * m + d
                                 day_ = month_ * 31 + d
                                 # month = m
-                                feature_array[contr_position, res_position, day_, norm_dict[i[0]]] = \
-                                    i[1].loc[:, 'act_reg_qty'].sum()
-
-                                # feature_array[contr_position, res_position, month_, norm_dict[i[0]]] = \
+                                # feature_array[contr_position, res_position, day_, norm_dict[i[0]]] = \
                                 #     i[1].loc[:, 'act_reg_qty'].sum()
-
+                                feature_array[contr_position, res_position, day_, norm_dict[i[0]]] = \
+                                    i[1].loc[:, FO].sum()
 
                             sum_feature_array = np.around(feature_array[contr_position, res_position, day_].sum(), 2)
-                            sum_dataframe = np.around(df_res_month.act_reg_qty.sum(), 2)
+                            # sum_dataframe = np.around(df_res_month.act_reg_qty.sum(), 2)
+                            sum_dataframe = np.around(df_res_month[FO].sum(), 2)
 
                             # проверка все ли значения сохранили
                             # assert abs(sum_feature_array - sum_dataframe) < 3, f'DEBUG:контрактор_id = {c}, ' \
@@ -107,10 +110,13 @@ def prepare_features(df: pd.DataFrame, path: str, save_path: str, stages_dict: d
                         # тут суммируем по нормам:
                         for i in df_res_month.groupby(by=['PO_id']):
                             month_ = (y - 2021) * 12 + m
+                            # feature_array[contr_position, res_position, month_, norm_dict[i[0]]] = \
+                            #     i[1].loc[:, 'act_reg_qty'].sum()
                             feature_array[contr_position, res_position, month_, norm_dict[i[0]]] = \
-                                i[1].loc[:, 'act_reg_qty'].sum()
+                                i[1].loc[:, FO].sum()
                         sum_feature_array = np.around(feature_array[contr_position, res_position, month_].sum(), 2)
-                        sum_dataframe = np.around(df_res_month.act_reg_qty.sum(), 2)
+                        # sum_dataframe = np.around(df_res_month.act_reg_qty.sum(), 2)
+                        sum_dataframe = np.around(df_res_month[FO].sum(), 2)
 
                         # проверка все ли значения сохранили
                         # assert abs(sum_feature_array - sum_dataframe) < 3, f'DEBUG:контрактор_id = {c}, ' \
@@ -120,6 +126,9 @@ def prepare_features(df: pd.DataFrame, path: str, save_path: str, stages_dict: d
                         if y == 2022:
                             # записываем месяц
                             feature_array[contr_position, res_position, month_, -3] = month_ - 12
+                        elif y == 2023:
+                            # записываем месяц
+                            feature_array[contr_position, res_position, month_, -3] = month_ - 24
                         else:
                             # записываем месяц
                             feature_array[contr_position, res_position, month_, -3] = month_
@@ -135,12 +144,15 @@ def prepare_features(df: pd.DataFrame, path: str, save_path: str, stages_dict: d
                         feature_array[contr_position, res_position, month_, 0] = c
 
         # проверка
-        sum_dataframe = np.around(df.loc[(df.contr_id == c) & (df.mat_res_name != 'Стоимость'), 'act_reg_qty'].sum(), 2)
+        # sum_dataframe = np.around(df.loc[(df.contr_id == c) & (df.mat_res_name != 'Стоимость'), 'act_reg_qty'].sum(), 2)
+        sum_dataframe = np.around(df.loc[(df.contr_id == c) & (df.mat_res_name != 'Стоимость'), FO].sum(), 2)
         sum_feature_array = np.around(feature_array[contr_position][:, :, 1:-3].sum(), 2)
 
+        # sum_PO_na_values = np.around(
+        #     df.loc[(df.contr_id == c) & (df.mat_res_name != 'Стоимость') & pd.isna(df.PO_id)].act_reg_qty.sum(), 2)
         sum_PO_na_values = np.around(
-            df.loc[(df.contr_id == c) & (df.mat_res_name != 'Стоимость') & pd.isna(df.PO_id)].act_reg_qty.sum(), 2)
-        print(f'INFO: контрактор_id = {c}, сумма значений act_reg_qty без указания норм = {sum_PO_na_values}')
+            df.loc[(df.contr_id == c) & (df.mat_res_name != 'Стоимость') & pd.isna(df.PO_id)][FO].sum(), 2)
+        print(f'INFO: контрактор_id = {c}, сумма значений {FO} без указания норм = {sum_PO_na_values}')
         # проверка все ли значения сохранили
         # assert abs(sum_dataframe - (
         #             sum_feature_array + sum_PO_na_values)) < 1, f'DEBUG:контрактор_id = {c} по всем ресурсам, суммы часов sum_feature_array = {sum_feature_array} ,sum_dataframe = {sum_dataframe} должны быть одинаковыми'
